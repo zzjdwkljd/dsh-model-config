@@ -70,10 +70,20 @@ interface GenerateOptions {
 	readonly signal?: AbortSignal;
 }
 
-/** A plain user turn; the probe never sends anything richer. */
+/** One text block; the probe never sends anything richer. */
+interface TextBlock {
+	readonly type: "text";
+	readonly text: string;
+}
+
+/**
+ * A plain user turn. The `llm` contract types message content as a block
+ * array, and the runtime plus every adapter call `content.some(...)` on it, so
+ * a bare string fails there instead of ever reaching the provider.
+ */
 interface LlmRequestMessage {
 	readonly role: "user";
-	readonly content: string;
+	readonly content: readonly TextBlock[];
 }
 
 /* -------------------------------------------------------------- host contracts */
@@ -180,7 +190,7 @@ async function probeModel(ctx: HostContext, provider: string, model: string): Pr
 		const stream = ctx.llm.stream({
 			provider,
 			model,
-			messages: [{ role: "user", content: PROBE_PROMPT }],
+			messages: [{ role: "user", content: [{ type: "text", text: PROBE_PROMPT }] }],
 			maxTokens: 64,
 			signal: controller.signal
 		});

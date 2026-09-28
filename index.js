@@ -82,7 +82,7 @@ async function probeModel(ctx, provider, model) {
         const stream = ctx.llm.stream({
             provider,
             model,
-            messages: [{ role: "user", content: PROBE_PROMPT }],
+            messages: [{ role: "user", content: [{ type: "text", text: PROBE_PROMPT }] }],
             maxTokens: 64,
             signal: controller.signal
         });

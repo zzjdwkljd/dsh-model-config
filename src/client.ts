@@ -206,6 +206,15 @@ interface DirectoryEntry {
 
 type PageStatus = "loading" | "ready" | "error";
 
+/** A pending destructive confirmation: one model or one whole provider. */
+interface ConfirmTarget {
+	kind: "model" | "provider";
+	provider: string;
+	index?: number;
+	title: string;
+	detail: string;
+}
+
 interface PageState {
 	status: PageStatus;
 	error: string | null;
@@ -277,13 +286,23 @@ window.__ModuleLoader__.load({
 			idRequired: "Model ID is required.",
 			idDuplicate: "Model ID must be unique.",
 			vision: "Vision",
-			visionOn: "Vision on",
+			visionOn: "Vision",
 			visionLabel: "Vision for {model}",
 			test: "Test",
 			testing: "Testing…",
 			testOk: "Connected — the model answered.",
 			conflict: "These settings changed elsewhere. Refresh and try again.",
-			noNamespace: "The settings section for this provider was not found."
+			noNamespace: "The settings section for this provider was not found.",
+			addModelFor: "Add a model to {provider}",
+			addHint: "Enter the model ID, test it if you like, then add it.",
+			deleteModel: "Delete model",
+			deleteProvider: "Delete provider",
+			deleteModelTitle: "Delete this model?",
+			deleteModelBody: "{model} will be removed from {provider}. This writes to your profile configuration and cannot be undone.",
+			deleteProviderTitle: "Delete this provider?",
+			deleteProviderBody: "{provider} and its {count} models will be removed from your profile configuration. This cannot be undone.",
+			delete: "Delete",
+			close: "Close"
 		};
 
 		/** Chinese strings. */
@@ -315,82 +334,122 @@ window.__ModuleLoader__.load({
 			idRequired: "模型 ID 不能为空。",
 			idDuplicate: "模型 ID 不能重复。",
 			vision: "识图",
-			visionOn: "支持识图",
+			visionOn: "视觉",
 			visionLabel: "识图（{model}）",
 			test: "测试",
 			testing: "测试中…",
 			testOk: "连通正常，模型已应答。",
 			conflict: "设置已在别处被修改，请刷新后重试。",
-			noNamespace: "找不到该提供商的设置分区。"
+			noNamespace: "找不到该提供商的设置分区。",
+			addModelFor: "添加到 {provider}",
+			addHint: "填写模型 ID，可先测试连通性再添加。",
+			deleteModel: "删除模型",
+			deleteProvider: "删除品牌商",
+			deleteModelTitle: "删除该模型？",
+			deleteModelBody: "将从 {provider} 中移除 {model}。该操作会写入你的 profile 配置，无法撤销。",
+			deleteProviderTitle: "删除该品牌商？",
+			deleteProviderBody: "将从 profile 配置中移除 {provider} 及其 {count} 个模型，无法撤销。",
+			delete: "删除",
+			close: "关闭"
 		};
 
 		/** Component-local styles; unmounting the page removes them with it. */
 		const MCF_CSS = `
-.mcf-page{box-sizing:border-box;height:100%;color:var(--dsw-alias-label-primary);flex-direction:column;align-items:center;gap:32px;padding:0 clamp(24px,4vw,48px) 48px;display:flex;overflow:auto}
-.mcf-page>*{width:100%;max-width:960px}
-.mcf-pageHead{box-sizing:border-box;justify-content:space-between;align-items:flex-start;gap:16px;padding-top:28px;display:flex}
-.mcf-pageTitle{margin:0;font-size:20px;font-weight:500;line-height:28px}
-.mcf-pageIntro{color:var(--dsw-alias-label-secondary);margin:4px 0 0;font-size:13px;line-height:20px;max-width:70ch}
-.mcf-toolbar{justify-content:flex-end;align-items:center;gap:8px;display:flex}
-.mcf-updated{color:var(--dsw-alias-label-tertiary);align-self:center;white-space:nowrap;font-size:12px;line-height:18px}
+.mcf-page{box-sizing:border-box;height:100%;overflow:auto;flex-direction:column;align-items:center;gap:24px;padding:0 32px 56px;display:flex;background:var(--mcf-bg);color:var(--mcf-text);font-family:var(--dsw-font-family,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif);font-size:14px;line-height:22px;--mcf-accent:#635BFF;--mcf-accent-hover:#574FE8;--mcf-accent-soft:#EEEDFF;--mcf-tag-bg:#F0F0FF;--mcf-tag-line:#E5E3FF;--mcf-accent-line:#DCD9FF;--mcf-ring:#C7C2FF;--mcf-bg:#F6F7F9;--mcf-surface:#FFFFFF;--mcf-surface-hover:#FAFAFF;--mcf-surface-open:#FBFBFF;--mcf-text:#18181B;--mcf-text-2:#71717A;--mcf-text-3:#A1A1AA;--mcf-border:#E8E8EC;--mcf-border-hover:#DDDDF0;--mcf-neutral:#F4F4F5;--mcf-track-off:#D9DCE3;--mcf-ghost-border:#E4E4E7;--mcf-ghost-text:#52525B;--mcf-danger:#D92D20;--mcf-danger-strong:#B42318;--mcf-danger-soft:#FEF3F2;--mcf-danger-line:#FDA29B;--mcf-scrim:#18181B66;--mcf-success:#067647}
+body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-surface-hover:#1F1F24;--mcf-surface-open:#1A1922;--mcf-text:#FAFAFA;--mcf-text-2:#A1A1AA;--mcf-text-3:#71717A;--mcf-border:#27272A;--mcf-border-hover:#3A3A45;--mcf-neutral:#232327;--mcf-accent-soft:#26243F;--mcf-tag-bg:#26243F;--mcf-tag-line:#3A3563;--mcf-accent-line:#4B45A8;--mcf-ring:#4B45A8;--mcf-track-off:#3F3F46;--mcf-ghost-border:#3F3F46;--mcf-ghost-text:#D4D4D8;--mcf-danger:#F97066;--mcf-danger-strong:#D92D20;--mcf-danger-soft:#3A1A18;--mcf-danger-line:#7A2A24;--mcf-scrim:#000000A6}
+.mcf-page>*{width:100%;max-width:1104px}
+.mcf-pageHead{box-sizing:border-box;justify-content:space-between;align-items:flex-start;gap:16px;padding-top:32px;display:flex}
+.mcf-pageTitle{margin:0;color:var(--mcf-text);font-size:20px;font-weight:600;line-height:28px;letter-spacing:-.01em}
+.mcf-pageIntro{color:var(--mcf-text-2);margin:6px 0 0;font-size:13px;line-height:20px;max-width:640px}
+.mcf-toolbar{justify-content:flex-end;align-items:center;gap:10px;display:flex}
+.mcf-updated{color:var(--mcf-text-3);align-self:center;white-space:nowrap;font-size:12px;line-height:18px}
 @keyframes mcf-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .mcf-spin{animation:mcf-spin .8s linear infinite;transform-origin:50% 50%}
-@media (prefers-reduced-motion:reduce){.mcf-spin{animation:none}}
-.mcf-status{color:var(--dsw-alias-label-tertiary);margin:0;font-size:13px;line-height:20px}
-.mcf-failure{color:var(--dsw-alias-state-error-primary);align-items:center;gap:12px;display:flex}
+.mcf-status{color:var(--mcf-text-3);margin:0;font-size:13px;line-height:20px}
+.mcf-failure{color:var(--mcf-danger);align-items:center;gap:12px;display:flex}
 .mcf-failure p{margin:0;font-size:13px;line-height:20px}
-.mcf-notice{border-radius:var(--dsw-radius-md);background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary);margin:0;padding:8px 12px;font-size:12px;line-height:18px}
-.mcf-groups{flex-direction:column;gap:10px;display:flex}
-.mcf-group{border-radius:var(--dsw-radius-xl);--dsw-elevation-stroke-color:var(--dsw-alias-settings-card-stroke);box-shadow:var(--dsw-elevation-soft);flex-direction:column;display:flex}
-.mcf-provider{box-sizing:border-box;border:none;background:var(--dsw-alias-settings-card-fill);border-radius:var(--dsw-radius-xl);color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;text-align:left;align-items:center;gap:12px;width:100%;padding:12px 14px;display:flex}
-.mcf-provider:hover{background:var(--dsw-alias-interactive-bg-hover)}
-.mcf-provider:focus-visible{outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px}
-.mcf-provider[aria-expanded=true]{border-bottom-left-radius:0;border-bottom-right-radius:0;background:var(--dsw-alias-settings-card-fill)}
-.mcf-provider[aria-expanded=true]:hover{background:var(--dsw-alias-settings-card-fill)}
-.mcf-providerIdentity{align-items:baseline;gap:8px;min-width:0;display:inline-flex}
-.mcf-providerName{font-size:14px;font-weight:500;line-height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mcf-providerId{color:var(--dsw-alias-label-tertiary);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mcf-providerTags{align-items:center;gap:8px;margin-left:auto;display:inline-flex}
-.mcf-tag{box-sizing:border-box;border:.5px solid var(--dsw-alias-border-l3);border-radius:var(--dsw-radius-xs);color:var(--dsw-alias-label-secondary);white-space:nowrap;padding:1px 6px;font-size:11px;line-height:16px}
-.mcf-tagOn{border-color:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary)}
-.mcf-count{color:var(--dsw-alias-label-caption);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:12px;line-height:18px}
-.mcf-chevron{color:var(--dsw-alias-label-tertiary);flex:none;justify-content:center;align-items:center;width:16px;height:16px;display:inline-flex}
-.mcf-panel{box-sizing:border-box;border:none;background:var(--dsw-alias-settings-card-fill);border-bottom-left-radius:var(--dsw-radius-xl);border-bottom-right-radius:var(--dsw-radius-xl);flex-direction:column;gap:12px;padding:12px 14px 14px;display:flex}
+.mcf-notice{border-radius:9px;background:var(--mcf-neutral);color:var(--mcf-text-2);margin:0;padding:9px 12px;font-size:12px;line-height:18px}
+.mcf-error{color:var(--mcf-danger);margin:0;font-size:12px;line-height:18px}
+.mcf-groups{flex-direction:column;gap:12px;display:flex}
+.mcf-group{box-sizing:border-box;position:relative;border:1px solid var(--mcf-border);border-radius:16px;background:var(--mcf-surface);flex-direction:column;display:flex;overflow:hidden;transition:background-color 180ms ease-out,border-color 180ms ease-out}
+.mcf-group::before{content:"";position:absolute;top:0;bottom:0;left:0;width:3px;background:var(--mcf-accent);opacity:0;transition:opacity 180ms ease-out}
+.mcf-group:hover:not([data-open=true]){background:var(--mcf-surface-hover);border-color:var(--mcf-border-hover)}
+.mcf-group[data-open=true]{background:var(--mcf-surface-open);border-color:var(--mcf-accent-line)}
+.mcf-group[data-open=true]::before{opacity:1}
+.mcf-provider{box-sizing:border-box;border:0;background:0 0;color:inherit;font:inherit;cursor:pointer;text-align:left;align-items:center;gap:12px;width:100%;padding:12px 16px;display:flex}
+.mcf-provider:focus-visible{outline:2px solid var(--mcf-ring);outline-offset:-3px;border-radius:16px}
+.mcf-providerIcon{box-sizing:border-box;flex:none;justify-content:center;align-items:center;width:32px;height:32px;border-radius:9px;background:var(--mcf-accent-soft);color:var(--mcf-accent);font-size:12px;font-weight:600;line-height:1;letter-spacing:.02em;display:inline-flex;overflow:hidden}
+.mcf-providerIcon img{width:100%;height:100%;object-fit:contain;display:block}
+.mcf-providerIdentity{flex-direction:column;flex:1 1 auto;gap:1px;min-width:0;display:flex}
+.mcf-providerName{color:var(--mcf-text);font-size:14px;font-weight:600;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mcf-providerId{color:var(--mcf-text-3);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mcf-providerMeta{margin-left:auto;flex:none;align-items:center;gap:10px;display:inline-flex}
+.mcf-statusBadge{color:var(--mcf-text-2);white-space:nowrap;align-items:center;gap:6px;font-size:12px;line-height:18px;display:inline-flex}
+.mcf-statusBadge[data-on=false]{color:var(--mcf-text-3)}
+.mcf-dot{box-sizing:border-box;flex:none;width:7px;height:7px;border-radius:50%;background:var(--mcf-accent)}
+.mcf-statusBadge[data-on=false] .mcf-dot{background:0 0;border:1.5px solid var(--mcf-text-3)}
+.mcf-countBadge{box-sizing:border-box;height:22px;padding:0 8px;border-radius:6px;background:var(--mcf-neutral);color:var(--mcf-text-2);white-space:nowrap;font-variant-numeric:tabular-nums;font-size:11px;line-height:22px}
+.mcf-chevron{flex:none;color:var(--mcf-text-3);justify-content:center;align-items:center;width:16px;height:16px;display:inline-flex}
+.mcf-chevron svg{transition:transform 180ms ease-out}
+.mcf-provider[aria-expanded=true] .mcf-chevron svg{transform:rotate(90deg)}
+.mcf-panelWrap{display:grid;grid-template-rows:0fr;transition:grid-template-rows 180ms ease-out}
+.mcf-panelWrap[data-open=true]{grid-template-rows:1fr}
+.mcf-panelClip{min-height:0;overflow:hidden;visibility:hidden;transition:visibility 180ms}
+.mcf-panelWrap[data-open=true] .mcf-panelClip{visibility:visible}
+.mcf-panel{box-sizing:border-box;border-top:1px solid var(--mcf-border);flex-direction:column;gap:12px;padding:14px 16px 16px;display:flex}
 .mcf-panelHead{justify-content:space-between;align-items:center;gap:12px;display:flex}
-.mcf-panelTitle{color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:500;line-height:18px;letter-spacing:.04em;text-transform:uppercase}
+.mcf-panelActions{align-items:center;gap:8px;display:flex}
+.mcf-panelTitle{color:var(--mcf-text-3);font-size:11px;font-weight:600;line-height:16px;letter-spacing:.08em;text-transform:uppercase}
 .mcf-models{flex-direction:column;gap:8px;margin:0;padding:0;list-style:none;display:flex}
-.mcf-model{box-sizing:border-box;border:.5px solid var(--dsw-alias-border-l4);border-radius:var(--dsw-radius-lg);background:var(--dsw-alias-bg-layer-1);flex-direction:column;gap:8px;padding:10px 12px;display:flex}
-.mcf-modelMain{align-items:center;gap:10px;flex-wrap:wrap;display:flex}
-.mcf-modelId{color:var(--dsw-alias-label-primary);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:20px;max-width:46%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mcf-modelName{color:var(--dsw-alias-label-secondary);font-size:13px;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mcf-modelActions{margin-left:auto;align-items:center;gap:12px;display:inline-flex}
-.mcf-switchWrap{align-items:center;gap:6px;display:inline-flex}
-.mcf-switchLabel{color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}
-.mcf-switch{box-sizing:border-box;position:relative;flex:none;width:34px;height:20px;border-radius:999px;border:.5px solid var(--dsw-alias-border-l3);background:var(--dsw-alias-bg-layer-2);cursor:pointer;padding:0;transition:background-color .15s ease,border-color .15s ease}
-.mcf-switch[aria-checked=true]{background:var(--dsw-alias-button-primary-fill);border-color:transparent}
-.mcf-switch:disabled{cursor:default;opacity:.5}
-.mcf-switch:focus-visible{outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px}
-.mcf-switchThumb{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--dsw-alias-label-primary);transition:transform .15s ease,background-color .15s ease}
-.mcf-switch[aria-checked=true] .mcf-switchThumb{transform:translateX(14px);background:var(--dsw-alias-label-primary-foreground)}
-.mcf-testResult{margin:0;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
-.mcf-testResultOk{color:var(--dsw-alias-state-success-primary)}
-.mcf-testResultFail{color:var(--dsw-alias-state-error-primary)}
-.mcf-error{color:var(--dsw-alias-state-error-primary);margin:0;font-size:12px;line-height:18px}
-.mcf-addForm{box-sizing:border-box;border:.5px dashed var(--dsw-alias-border-l3);border-radius:var(--dsw-radius-lg);flex-direction:column;gap:10px;padding:12px;display:flex}
-.mcf-field{flex-direction:column;gap:4px;display:flex}
-.mcf-field>span{color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}
-.mcf-input{box-sizing:border-box;border:.5px solid var(--dsw-alias-border-l4);border-radius:var(--dsw-radius-md);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;height:32px;padding:0 10px;font-size:13px;line-height:20px;width:100%}
-.mcf-input::placeholder{color:var(--dsw-alias-label-caption)}
-.mcf-input:focus{outline:none;border-color:var(--dsw-alias-border-l3);box-shadow:0 0 0 1px var(--dsw-alias-state-business-primary)}
-.mcf-actions{gap:8px;display:flex}
-.mcf-btn{box-sizing:border-box;border-radius:var(--dsw-radius-md);height:32px;font:inherit;cursor:pointer;justify-content:center;align-items:center;gap:4px;padding:0 12px;font-size:13px;line-height:20px;display:inline-flex;background:0 0;border:.5px solid var(--dsw-alias-border-l3);color:var(--dsw-alias-label-primary)}
-.mcf-btn:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}
-.mcf-btn:disabled{cursor:default;opacity:.5}
-.mcf-btn:focus-visible{outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px}
-.mcf-btnPrimary{background:var(--dsw-alias-button-primary-fill);border-color:transparent;color:var(--dsw-alias-label-primary-foreground)}
-.mcf-btnPrimary:hover:not(:disabled){background:var(--dsw-alias-button-primary-fill)}
-.mcf-btnSm{height:28px;padding:0 10px;font-size:12px;line-height:18px}
-.mcf-iconBtn{width:32px;padding:0}
+.mcf-model{box-sizing:border-box;border:1px solid var(--mcf-border);border-radius:12px;background:var(--mcf-surface);flex-direction:column;gap:8px;padding:12px 14px;display:flex;transition:border-color 180ms ease-out}
+.mcf-model:hover{border-color:var(--mcf-border-hover)}
+.mcf-modelMain{align-items:center;gap:12px;flex-wrap:wrap;display:flex}
+.mcf-modelText{flex-direction:column;flex:1 1 auto;gap:1px;min-width:0;display:flex}
+.mcf-modelId{color:var(--mcf-text);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;font-weight:500;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mcf-modelName{color:var(--mcf-text-2);font-size:12px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mcf-modelActions{margin-left:auto;flex:none;align-items:center;gap:10px;display:inline-flex}
+.mcf-tag{box-sizing:border-box;height:22px;padding:0 8px;border-radius:6px;border:1px solid var(--mcf-tag-line);background:var(--mcf-tag-bg);color:var(--mcf-accent);white-space:nowrap;align-items:center;font-size:11px;font-weight:500;line-height:1;display:inline-flex}
+.mcf-switchWrap{align-items:center;gap:8px;display:inline-flex}
+.mcf-switchLabel{color:var(--mcf-text-2);font-size:12px;line-height:18px}
+.mcf-switch{box-sizing:border-box;position:relative;flex:none;width:44px;height:24px;padding:0;border:0;border-radius:999px;corner-shape:round;background:var(--mcf-track-off);cursor:pointer;font:inherit;transition:background-color 180ms ease-out}
+.mcf-switch[aria-checked=true]{background:var(--mcf-accent)}
+.mcf-switch:disabled{cursor:default;opacity:.45}
+.mcf-switch:focus-visible{outline:2px solid var(--mcf-ring);outline-offset:2px}
+.mcf-switchThumb{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;corner-shape:round;background:#FFF;box-shadow:0 1px 2px #18181B2E;transition:transform 180ms ease-out}
+.mcf-switch[aria-checked=true] .mcf-switchThumb{transform:translateX(20px)}
+.mcf-testResult{margin:0;color:var(--mcf-text-3);font-size:12px;line-height:18px}
+.mcf-testResultOk{color:var(--mcf-success)}
+.mcf-testResultFail{color:var(--mcf-danger)}
+.mcf-field{flex-direction:column;gap:6px;display:flex}
+.mcf-field>span{color:var(--mcf-text-2);font-size:12px;font-weight:500;line-height:18px}
+.mcf-input{box-sizing:border-box;width:100%;height:34px;padding:0 12px;border-radius:9px;border:1px solid var(--mcf-border);background:var(--mcf-surface);color:var(--mcf-text);font:inherit;font-size:13px;line-height:20px;transition:border-color 160ms ease-out,box-shadow 160ms ease-out}
+.mcf-input::placeholder{color:var(--mcf-text-3)}
+.mcf-input:focus{outline:none;border-color:var(--mcf-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--mcf-accent) 22%,transparent)}
+.mcf-btn{box-sizing:border-box;justify-content:center;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:9px;border:1px solid var(--mcf-ghost-border);background:0 0;color:var(--mcf-ghost-text);font:inherit;font-size:13px;font-weight:500;line-height:20px;cursor:pointer;display:inline-flex;transition:background-color 160ms ease-out,border-color 160ms ease-out,color 160ms ease-out}
+.mcf-btn:hover:not(:disabled){background:var(--mcf-surface-hover)}
+.mcf-btn:disabled{cursor:default;opacity:.45}
+.mcf-btn:focus-visible{outline:2px solid var(--mcf-ring);outline-offset:2px}
+.mcf-btnPrimary{background:var(--mcf-accent);border-color:var(--mcf-accent);color:#FFF}
+.mcf-btnPrimary:hover:not(:disabled){background:var(--mcf-accent-hover)}
+.mcf-btnSm{height:32px;padding:0 12px;font-size:12px}
+.mcf-iconBtn{width:34px;padding:0}
+.mcf-btnSm.mcf-iconBtn{width:32px}
+.mcf-btnDanger{background:var(--mcf-danger);border-color:var(--mcf-danger);color:#FFF}
+.mcf-btnDanger:hover:not(:disabled){background:var(--mcf-danger-strong);border-color:var(--mcf-danger-strong)}
+.mcf-iconDanger:hover:not(:disabled){background:var(--mcf-danger-soft);border-color:var(--mcf-danger-line);color:var(--mcf-danger)}
+.mcf-page>.mcf-overlay{box-sizing:border-box;position:fixed;inset:0;z-index:60;width:auto;max-width:none;height:auto;background:var(--mcf-scrim);justify-content:center;align-items:center;padding:24px;display:flex;animation:mcf-fade 160ms ease-out}
+@keyframes mcf-fade{from{opacity:0}to{opacity:1}}
+@keyframes mcf-rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.mcf-modal{box-sizing:border-box;width:100%;max-width:460px;background:var(--mcf-surface);border:1px solid var(--mcf-border);border-radius:16px;box-shadow:0 16px 40px #18181B26;flex-direction:column;display:flex;animation:mcf-rise 160ms ease-out}
+.mcf-modalHead{justify-content:space-between;align-items:flex-start;gap:12px;padding:18px 18px 0;display:flex}
+.mcf-modalTitle{margin:0;color:var(--mcf-text);font-size:15px;font-weight:600;line-height:22px}
+.mcf-modalSub{margin:2px 0 0;color:var(--mcf-text-3);font-size:12px;line-height:18px}
+.mcf-modalBody{flex-direction:column;gap:14px;padding:16px 18px;display:flex}
+.mcf-modalFoot{border-top:1px solid var(--mcf-border);justify-content:flex-end;gap:8px;padding:14px 18px;display:flex}
+.mcf-confirmText{margin:0;color:var(--mcf-text-2);font-size:13px;line-height:20px}
+.mcf-testRow{flex-wrap:wrap;align-items:center;gap:10px;min-height:24px;display:flex}
+.mcf-modalHint{color:var(--mcf-text-3);font-size:12px;line-height:18px}
+@media (prefers-reduced-motion:reduce){.mcf-spin,.mcf-overlay,.mcf-modal{animation:none}.mcf-group,.mcf-group::before,.mcf-chevron svg,.mcf-panelWrap,.mcf-switch,.mcf-switchThumb,.mcf-model,.mcf-btn,.mcf-input{transition:none}}
 `;
 
 		/** Render a translate result with `{name}` placeholders filled in. */
@@ -569,13 +628,57 @@ window.__ModuleLoader__.load({
 			return typeof flag === "boolean" && flag;
 		}
 
-		/** Chevron for the accordion header. */
-		function Chevron(props: SlotProps) {
-			const open = props.open === true;
+		/** Chevron for the accordion header; CSS rotates it 90° while expanded. */
+		function Chevron() {
 			return h("svg", {
 				viewBox: "0 0 16 16", width: 16, height: 16, fill: "none", stroke: "currentColor",
-				strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true"
-			}, open ? h("path", { d: "M4 6.5l4 4 4-4" }) : h("path", { d: "M6.5 4l4 4-4 4" }));
+				strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true"
+			}, h("path", { d: "M6.5 4l4 4-4 4" }));
+		}
+
+		/**
+		 * Two-letter monogram standing in for a provider logo: the brand mark is
+		 * not bundled, so the icon container falls back to initials taken from the
+		 * route id (or, failing that, the first display-name character).
+		 * @param row - the provider row being rendered.
+		 * @returns 1-2 characters for the 32px icon container.
+		 */
+		function monogramOf(row: ProviderRow): string {
+			const source = row.provider.length > 0 ? row.provider : row.displayName;
+			const parts = source.split(/[^A-Za-z0-9]+/).filter((part) => part.length > 0);
+			const first = parts[0];
+			if (first === undefined) {
+				const chars = Array.from(row.displayName);
+				return chars.length > 0 ? chars[0] ?? "?" : "?";
+			}
+			const second = parts[1];
+			if (second === undefined) return first.slice(0, 2).toUpperCase();
+			return (first.slice(0, 1) + second.slice(0, 1)).toUpperCase();
+		}
+
+		/** Trash glyph for the destructive model / provider actions. */
+		function TrashIcon() {
+			return h("svg", {
+				viewBox: "0 0 16 16", width: 14, height: 14, fill: "none", stroke: "currentColor",
+				strokeWidth: 1.4, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true"
+			},
+				h("path", { d: "M2.7 4.4h10.6" }),
+				h("path", { d: "M6.2 4.4V3.2a.7.7 0 0 1 .7-.7h2.2a.7.7 0 0 1 .7.7v1.2" }),
+				h("path", { d: "M12.1 4.4l-.6 8.2a.8.8 0 0 1-.8.8H5.3a.8.8 0 0 1-.8-.8L3.9 4.4" }),
+				h("path", { d: "M6.7 7v3.9" }),
+				h("path", { d: "M9.3 7v3.9" })
+			);
+		}
+
+		/** Close glyph for the dialog header. */
+		function CloseIcon() {
+			return h("svg", {
+				viewBox: "0 0 16 16", width: 14, height: 14, fill: "none", stroke: "currentColor",
+				strokeWidth: 1.5, strokeLinecap: "round", "aria-hidden": "true"
+			},
+				h("path", { d: "M4.5 4.5l7 7" }),
+				h("path", { d: "M11.5 4.5l-7 7" })
+			);
 		}
 
 		/** Refresh glyph for the page toolbar; spins while a load is in flight. */
@@ -646,6 +749,8 @@ window.__ModuleLoader__.load({
 					const [draft, setDraft] = React.useState({ id: "", name: "" });
 					const [addError, setAddError] = React.useState<string | null>(null);
 					const [rowError, setRowError] = React.useState<Record<string, string | undefined>>({});
+					const [modalTest, setModalTest] = React.useState<TestState | null>(null);
+					const [confirming, setConfirming] = React.useState<ConfirmTarget | null>(null);
 					const [, setLocaleTick] = React.useState(0);
 					const generation = React.useRef(0);
 
@@ -764,6 +869,7 @@ window.__ModuleLoader__.load({
 						if (saved) {
 							setDraft({ id: "", name: "" });
 							setAddError(null);
+							setModalTest(null);
 							setAdding(null);
 						}
 					};
@@ -784,7 +890,85 @@ window.__ModuleLoader__.load({
 						setAdding(row.provider);
 						setDraft({ id: "", name: "" });
 						setAddError(null);
+						setModalTest(null);
 					};
+
+					/** Close the add-model dialog and drop its transient probe state. */
+					const closeAdd = (): void => {
+						setAdding(null);
+						setAddError(null);
+						setModalTest(null);
+					};
+
+					/** Probe the id currently typed in the dialog, before it is saved. */
+					const runModalTest = async (row: ProviderRow): Promise<void> => {
+						const id = draft.id.trim();
+						if (id.length === 0) return;
+						setModalTest({ status: "testing", message: "" });
+						const result = await testConnection(row.provider, id);
+						setModalTest(result.ok
+							? { status: "ok", message: t("testOk") }
+							: { status: "fail", message: result.message });
+					};
+
+					/**
+					 * Remove one provider's whole profile from the settings document.
+					 * The `unset` op names the profile path rather than rebuilding the
+					 * namespace from a partial view — the same shape the shipped Models
+					 * settings page writes, so the profile patch stays the source of truth.
+					 */
+					const removeProvider = async (row: ProviderRow): Promise<void> => {
+						const namespace = state.namespaces.get(row.settingsNs);
+						if (namespace === undefined) {
+							setRowError((current) => ({ ...current, [row.provider]: t("noNamespace") }));
+							return;
+						}
+						setBusy((current) => ({ ...current, [row.provider]: true }));
+						try {
+							const response = await ctx.remote.settings.mutate(
+								row.settingsNs,
+								[{ op: "unset", path: [...row.settingsPath] }],
+								namespace.revision
+							);
+							if (!response.ok) {
+								const conflict = response.error.code === "settings/conflict";
+								const message = conflict ? t("conflict") : response.error.message;
+								setRowError((current) => ({ ...current, [row.provider]: message }));
+								if (conflict) await load();
+								return;
+							}
+							setRowError((current) => ({ ...current, [row.provider]: undefined }));
+							setConfirming(null);
+							setOpenId(null);
+							await load();
+						} finally {
+							setBusy((current) => ({ ...current, [row.provider]: false }));
+						}
+					};
+
+					/** Dispatch the confirmed destructive action. */
+					const runConfirm = async (target: ConfirmTarget): Promise<void> => {
+						const row = state.rows.find((candidate) => candidate.provider === target.provider);
+						if (row === undefined) {
+							setConfirming(null);
+							return;
+						}
+						if (target.kind === "model") {
+							const index = target.index;
+							if (index === undefined || row.models[index] === undefined) {
+								setConfirming(null);
+								return;
+							}
+							const saved = await commit(row, row.models.filter((_, at) => at !== index));
+							if (saved) setConfirming(null);
+							return;
+						}
+						await removeProvider(row);
+					};
+
+					/** Whether a whole provider may be removed from this page at all. */
+					const canRemoveProvider = (row: ProviderRow): boolean =>
+						row.editable && state.writable && row.settingsPath.length > 0;
 
 					const renderModel = (row: ProviderRow, model: ModelRow, index: number) => {
 						const field = inputFieldOf(row);
@@ -795,13 +979,17 @@ window.__ModuleLoader__.load({
 						const testing = result !== undefined && result.status === "testing";
 						const editable = row.editable && state.writable;
 						const name = typeof model.name === "string" && model.name.length > 0 ? model.name : undefined;
+						const providerName = row.displayName.length === 0 ? row.provider : row.displayName;
 						return h("li", { className: "mcf-model", key },
 							h("div", { className: "mcf-modelMain" },
-								h("code", { className: "mcf-modelId", title: id }, id),
-								name === undefined ? null : h("span", { className: "mcf-modelName", title: name }, name),
-								vision ? h("span", { className: "mcf-tag mcf-tagOn" }, t("visionOn")) : null,
+								h("div", { className: "mcf-modelText" },
+									h("code", { className: "mcf-modelId", title: id }, id),
+									name === undefined ? null : h("span", { className: "mcf-modelName", title: name }, name)
+								),
 								h("div", { className: "mcf-modelActions" },
+									vision ? h("span", { className: "mcf-tag" }, t("visionOn")) : null,
 									h("span", { className: "mcf-switchWrap" },
+										h("span", { className: "mcf-switchLabel" }, t("vision")),
 										h("button", {
 											type: "button",
 											role: "switch",
@@ -810,8 +998,7 @@ window.__ModuleLoader__.load({
 											disabled: !editable || busy[row.provider] === true,
 											"aria-label": fill(t("visionLabel"), { model: id }),
 											onClick: () => void toggleVision(row, index)
-										}, h("span", { className: "mcf-switchThumb" })),
-										h("span", { className: "mcf-switchLabel" }, t("vision"))
+										}, h("span", { className: "mcf-switchThumb" }))
 									),
 									h("button", {
 										type: "button",
@@ -819,7 +1006,21 @@ window.__ModuleLoader__.load({
 										disabled: testing || !row.active,
 										title: row.active ? undefined : t("inactiveHint"),
 										onClick: () => void runTest(row, id, key)
-									}, testing ? t("testing") : t("test"))
+									}, testing ? t("testing") : t("test")),
+									editable ? h("button", {
+										type: "button",
+										className: "mcf-btn mcf-btnSm mcf-iconBtn mcf-iconDanger",
+										disabled: busy[row.provider] === true,
+										title: t("deleteModel"),
+										"aria-label": `${t("deleteModel")} ${id}`,
+										onClick: () => setConfirming({
+											kind: "model",
+											provider: row.provider,
+											index,
+											title: t("deleteModelTitle"),
+											detail: fill(t("deleteModelBody"), { model: id, provider: providerName })
+										})
+									}, h(TrashIcon, {})) : null
 								)
 							),
 							result === undefined || result.status === "testing" ? null : h("p", {
@@ -830,15 +1031,34 @@ window.__ModuleLoader__.load({
 
 					const renderPanel = (row: ProviderRow, panelId: string) => {
 						const editable = row.editable && state.writable;
+						const providerName = row.displayName.length === 0 ? row.provider : row.displayName;
 						return h("div", { className: "mcf-panel", id: panelId },
 							h("div", { className: "mcf-panelHead" },
 								h("span", { className: "mcf-panelTitle" }, t("models")),
-								editable ? h("button", {
-									type: "button",
-									className: "mcf-btn mcf-btnSm",
-									disabled: busy[row.provider] === true,
-									onClick: () => startAdd(row)
-								}, t("addModel")) : null
+								h("div", { className: "mcf-panelActions" },
+									editable && canRemoveProvider(row) ? h("button", {
+										type: "button",
+										className: "mcf-btn mcf-btnSm mcf-iconBtn mcf-iconDanger",
+										disabled: busy[row.provider] === true,
+										title: t("deleteProvider"),
+										"aria-label": `${t("deleteProvider")} ${providerName}`,
+										onClick: () => setConfirming({
+											kind: "provider",
+											provider: row.provider,
+											title: t("deleteProviderTitle"),
+											detail: fill(t("deleteProviderBody"), {
+												provider: providerName,
+												count: String(row.models.length)
+											})
+										})
+									}, h(TrashIcon, {})) : null,
+									editable ? h("button", {
+										type: "button",
+										className: "mcf-btn mcf-btnSm mcf-btnPrimary",
+										disabled: busy[row.provider] === true,
+										onClick: () => startAdd(row)
+									}, t("addModel")) : null
+								)
 							),
 							row.editable ? null : h("p", { className: "mcf-notice" }, t("notEditable")),
 							row.editable && !state.writable ? h("p", { className: "mcf-notice" }, t("readOnly")) : null,
@@ -846,54 +1066,6 @@ window.__ModuleLoader__.load({
 							row.models.length === 0
 								? h("p", { className: "mcf-status" }, t("modelsEmpty"))
 								: h("ul", { className: "mcf-models" }, row.models.map((model, index) => renderModel(row, model, index))),
-							adding === row.provider ? h("div", { className: "mcf-addForm" },
-								h("label", { className: "mcf-field" },
-									h("span", null, t("modelId")),
-									h("input", {
-										className: "mcf-input",
-										type: "text",
-										value: draft.id,
-										placeholder: t("modelIdPlaceholder"),
-										"aria-label": t("modelId"),
-										autoFocus: true,
-										onChange: (event) => setDraft((current) => ({ ...current, id: event.target.value })),
-										onKeyDown: (event) => {
-											if (event.key === "Enter") {
-												event.preventDefault();
-												void submitAdd(row);
-											}
-										}
-									})
-								),
-								h("label", { className: "mcf-field" },
-									h("span", null, t("modelName")),
-									h("input", {
-										className: "mcf-input",
-										type: "text",
-										value: draft.name,
-										"aria-label": t("modelName"),
-										onChange: (event) => setDraft((current) => ({ ...current, name: event.target.value }))
-									})
-								),
-								h("div", { className: "mcf-actions" },
-									h("button", {
-										type: "button",
-										className: "mcf-btn mcf-btnPrimary",
-										disabled: busy[row.provider] === true,
-										onClick: () => void submitAdd(row)
-									}, t("add")),
-									h("button", {
-										type: "button",
-										className: "mcf-btn",
-										disabled: busy[row.provider] === true,
-										onClick: () => {
-											setAdding(null);
-											setAddError(null);
-										}
-									}, t("cancel"))
-								),
-								addError === null ? null : h("p", { className: "mcf-error" }, addError)
-							) : null,
 							rowError[row.provider] === undefined ? null : h("p", { className: "mcf-error" }, rowError[row.provider])
 						);
 					};
@@ -901,7 +1073,8 @@ window.__ModuleLoader__.load({
 					const renderProvider = (row: ProviderRow, index: number) => {
 						const open = openId === row.provider;
 						const panelId = `mcf-panel-${String(index)}`;
-						return h("section", { className: "mcf-group", key: row.provider },
+						const name = row.displayName.length === 0 ? row.provider : row.displayName;
+						return h("section", { className: "mcf-group", key: row.provider, "data-open": open ? "true" : "false" },
 							h("button", {
 								type: "button",
 								className: "mcf-provider",
@@ -915,19 +1088,200 @@ window.__ModuleLoader__.load({
 									}
 								}
 							},
+								h("span", { className: "mcf-providerIcon", "aria-hidden": "true" }, monogramOf(row)),
 								h("span", { className: "mcf-providerIdentity" },
-									h("span", { className: "mcf-providerName" }, row.displayName.length === 0 ? row.provider : row.displayName),
-									row.displayName === row.provider ? null : h("span", { className: "mcf-providerId" }, row.provider)
+									h("span", { className: "mcf-providerName", title: name }, name),
+									row.displayName === row.provider ? null : h("span", { className: "mcf-providerId", title: row.provider }, row.provider)
 								),
-								h("span", { className: "mcf-providerTags" },
-									h("span", { className: "mcf-tag" }, row.active ? t("active") : t("inactive")),
-									h("span", { className: "mcf-count" }, fill(t("modelCount"), { count: String(row.models.length) }))
+								h("span", { className: "mcf-providerMeta" },
+									h("span", {
+										className: "mcf-statusBadge",
+										"data-on": row.active ? "true" : "false",
+										title: row.active ? undefined : t("inactiveHint")
+									},
+										h("span", { className: "mcf-dot", "aria-hidden": "true" }),
+										row.active ? t("active") : t("inactive")
+									),
+									h("span", { className: "mcf-countBadge" }, fill(t("modelCount"), { count: String(row.models.length) }))
 								),
-								h("span", { className: "mcf-chevron" }, h(Chevron, { open }))
+								h("span", { className: "mcf-chevron", "aria-hidden": "true" }, h(Chevron, {}))
 							),
-							open ? renderPanel(row, panelId) : null
+							h("div", { className: "mcf-panelWrap", "data-open": open ? "true" : "false" },
+								h("div", { className: "mcf-panelClip" }, renderPanel(row, panelId))
+							)
 						);
 					};
+
+					/**
+					* The one overlay the page may show: the add-model dialog, or the
+					* confirmation for a destructive removal. Both live outside the
+					* accordion so the panel's overflow clip cannot cut them off.
+					*/
+					const renderDialog = (): ReactNode => {
+						const providerNameOf = (row: ProviderRow): string =>
+							row.displayName.length === 0 ? row.provider : row.displayName;
+
+						if (confirming !== null) {
+							const target = confirming;
+							const row = state.rows.find((candidate) => candidate.provider === target.provider);
+							const error = rowError[target.provider];
+							return h("div", {
+								className: "mcf-overlay",
+								onClick: (event: import("react").MouseEvent<HTMLDivElement>) => {
+									if (event.target === event.currentTarget) setConfirming(null);
+								}
+							},
+								h("div", {
+									className: "mcf-modal",
+									role: "alertdialog",
+									"aria-modal": "true",
+									"aria-label": target.title
+								},
+									h("div", { className: "mcf-modalHead" },
+										h("h2", { className: "mcf-modalTitle" }, target.title),
+										h("button", {
+											type: "button",
+											className: "mcf-btn mcf-btnSm mcf-iconBtn",
+											"aria-label": t("close"),
+											title: t("close"),
+											onClick: () => setConfirming(null)
+										}, h(CloseIcon, {}))
+									),
+									h("div", { className: "mcf-modalBody" },
+										h("p", { className: "mcf-confirmText" }, target.detail),
+										error === undefined ? null : h("p", { className: "mcf-error" }, error)
+									),
+									h("div", { className: "mcf-modalFoot" },
+										h("button", {
+											type: "button",
+											className: "mcf-btn",
+											disabled: row !== undefined && busy[row.provider] === true,
+											onClick: () => setConfirming(null)
+										}, t("cancel")),
+										h("button", {
+											type: "button",
+											className: "mcf-btn mcf-btnDanger",
+											disabled: row !== undefined && busy[row.provider] === true,
+											onClick: () => void runConfirm(target)
+										}, t("delete"))
+									)
+								)
+							);
+						}
+
+						const row = adding === null
+							? undefined
+							: state.rows.find((candidate) => candidate.provider === adding);
+						if (row === undefined) return null;
+
+						const id = draft.id.trim();
+						const testing = modalTest !== null && modalTest.status === "testing";
+						const canTest = row.active && id.length > 0 && !testing;
+						const error = addError ?? rowError[row.provider];
+						return h("div", {
+							className: "mcf-overlay",
+							onClick: (event: import("react").MouseEvent<HTMLDivElement>) => {
+								if (event.target === event.currentTarget) closeAdd();
+							}
+						},
+							h("div", {
+								className: "mcf-modal",
+								role: "dialog",
+								"aria-modal": "true",
+								"aria-labelledby": "mcf-add-title"
+							},
+								h("div", { className: "mcf-modalHead" },
+									h("div", null,
+										h("h2", { className: "mcf-modalTitle", id: "mcf-add-title" }, t("addModel")),
+										h("p", { className: "mcf-modalSub" }, fill(t("addModelFor"), { provider: providerNameOf(row) }))
+									),
+									h("button", {
+										type: "button",
+										className: "mcf-btn mcf-btnSm mcf-iconBtn",
+										"aria-label": t("close"),
+										title: t("close"),
+										onClick: closeAdd
+									}, h(CloseIcon, {}))
+								),
+								h("div", { className: "mcf-modalBody" },
+									h("label", { className: "mcf-field" },
+										h("span", null, t("modelId")),
+										h("input", {
+											className: "mcf-input",
+											type: "text",
+											value: draft.id,
+											placeholder: t("modelIdPlaceholder"),
+											"aria-label": t("modelId"),
+											autoFocus: true,
+											onChange: (event) => {
+												setDraft((current) => ({ ...current, id: event.target.value }));
+												setModalTest(null);
+											},
+											onKeyDown: (event) => {
+												if (event.key === "Enter") {
+													event.preventDefault();
+													void submitAdd(row);
+												}
+											}
+										})
+									),
+									h("label", { className: "mcf-field" },
+										h("span", null, t("modelName")),
+										h("input", {
+											className: "mcf-input",
+											type: "text",
+											value: draft.name,
+											"aria-label": t("modelName"),
+											onChange: (event) => setDraft((current) => ({ ...current, name: event.target.value }))
+										})
+									),
+									h("div", { className: "mcf-testRow" },
+										h("button", {
+											type: "button",
+											className: "mcf-btn mcf-btnSm",
+											disabled: !canTest,
+											title: row.active ? undefined : t("inactiveHint"),
+											onClick: () => void runModalTest(row)
+										}, testing ? t("testing") : t("test")),
+										modalTest === null || testing
+											? h("span", { className: "mcf-modalHint" }, t("addHint"))
+											: h("span", {
+												className: "mcf-testResult " + (modalTest.status === "ok" ? "mcf-testResultOk" : "mcf-testResultFail")
+											}, modalTest.message)
+									),
+									error == null ? null : h("p", { className: "mcf-error" }, error)
+								),
+								h("div", { className: "mcf-modalFoot" },
+									h("button", {
+										type: "button",
+										className: "mcf-btn",
+										disabled: busy[row.provider] === true,
+										onClick: closeAdd
+									}, t("cancel")),
+									h("button", {
+										type: "button",
+										className: "mcf-btn mcf-btnPrimary",
+										disabled: busy[row.provider] === true,
+										onClick: () => void submitAdd(row)
+									}, t("add"))
+								)
+							)
+						);
+					};
+
+					/* Escape closes whichever overlay is open, wherever focus happens to be. */
+					React.useEffect(() => {
+						if (adding === null && confirming === null) return;
+						const onKey = (event: KeyboardEvent): void => {
+							if (event.key !== "Escape") return;
+							setConfirming(null);
+							setAdding(null);
+							setAddError(null);
+							setModalTest(null);
+						};
+						document.addEventListener("keydown", onKey);
+						return () => document.removeEventListener("keydown", onKey);
+					}, [adding, confirming]);
 
 					const loading = state.status === "loading" && state.rows.length === 0;
 					const failed = state.status === "error";
@@ -964,7 +1318,8 @@ window.__ModuleLoader__.load({
 						) : null,
 						!failed && !loading && state.rows.length === 0 ? h("p", { className: "mcf-status" }, t("empty")) : null,
 						state.rows.length > 0 ? h("div", { className: "mcf-groups" }, state.rows.map(renderProvider)) : null,
-						!state.writable && state.rows.length > 0 ? h("p", { className: "mcf-notice" }, t("readOnly")) : null
+						!state.writable && state.rows.length > 0 ? h("p", { className: "mcf-notice" }, t("readOnly")) : null,
+						renderDialog()
 					);
 				}
 
