@@ -209,6 +209,10 @@ type PageStatus = "loading" | "ready" | "error";
 interface PageState {
 	status: PageStatus;
 	error: string | null;
+	/** True from the moment a load starts until it settles; drives the refresh affordance. */
+	refreshing: boolean;
+	/** Local time of the last settled load, shown in the toolbar as evidence it ran. */
+	updatedAt: string | null;
 	writable: boolean;
 	rows: ProviderRow[];
 	namespaces: Map<string, SettingsNamespaceView>;
@@ -250,6 +254,8 @@ window.__ModuleLoader__.load({
 			title: "Model configuration",
 			intro: "Model providers in the current configuration. Add models by hand, test that a model answers, and switch vision on per model.",
 			refresh: "Refresh",
+			refreshing: "Refreshing…",
+			updated: "Updated {time}",
 			loading: "Loading providers…",
 			loadFailed: "Could not load the provider directory",
 			retry: "Retry",
@@ -286,6 +292,8 @@ window.__ModuleLoader__.load({
 			title: "模型配置",
 			intro: "当前配置下的模型提供商。可手动添加模型、测试模型是否能够连通，并为单个模型打开识图。",
 			refresh: "刷新",
+			refreshing: "刷新中…",
+			updated: "已更新 {time}",
 			loading: "正在加载提供商…",
 			loadFailed: "无法加载提供商目录",
 			retry: "重试",
@@ -324,13 +332,17 @@ window.__ModuleLoader__.load({
 .mcf-pageTitle{margin:0;font-size:20px;font-weight:500;line-height:28px}
 .mcf-pageIntro{color:var(--dsw-alias-label-secondary);margin:4px 0 0;font-size:13px;line-height:20px;max-width:70ch}
 .mcf-toolbar{justify-content:flex-end;align-items:center;gap:8px;display:flex}
+.mcf-updated{color:var(--dsw-alias-label-tertiary);align-self:center;white-space:nowrap;font-size:12px;line-height:18px}
+@keyframes mcf-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.mcf-spin{animation:mcf-spin .8s linear infinite;transform-origin:50% 50%}
+@media (prefers-reduced-motion:reduce){.mcf-spin{animation:none}}
 .mcf-status{color:var(--dsw-alias-label-tertiary);margin:0;font-size:13px;line-height:20px}
 .mcf-failure{color:var(--dsw-alias-state-error-primary);align-items:center;gap:12px;display:flex}
 .mcf-failure p{margin:0;font-size:13px;line-height:20px}
 .mcf-notice{border-radius:var(--dsw-radius-md);background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary);margin:0;padding:8px 12px;font-size:12px;line-height:18px}
 .mcf-groups{flex-direction:column;gap:10px;display:flex}
-.mcf-group{flex-direction:column;display:flex}
-.mcf-provider{box-sizing:border-box;border:.5px solid var(--dsw-alias-settings-card-stroke);background:var(--dsw-alias-settings-card-fill);border-radius:var(--dsw-radius-xl);color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;text-align:left;align-items:center;gap:12px;width:100%;padding:12px 14px;display:flex}
+.mcf-group{border-radius:var(--dsw-radius-xl);--dsw-elevation-stroke-color:var(--dsw-alias-settings-card-stroke);box-shadow:var(--dsw-elevation-soft);flex-direction:column;display:flex}
+.mcf-provider{box-sizing:border-box;border:none;background:var(--dsw-alias-settings-card-fill);border-radius:var(--dsw-radius-xl);color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;text-align:left;align-items:center;gap:12px;width:100%;padding:12px 14px;display:flex}
 .mcf-provider:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .mcf-provider:focus-visible{outline:var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px}
 .mcf-provider[aria-expanded=true]{border-bottom-left-radius:0;border-bottom-right-radius:0;background:var(--dsw-alias-settings-card-fill)}
@@ -343,7 +355,7 @@ window.__ModuleLoader__.load({
 .mcf-tagOn{border-color:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary)}
 .mcf-count{color:var(--dsw-alias-label-caption);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:12px;line-height:18px}
 .mcf-chevron{color:var(--dsw-alias-label-tertiary);flex:none;justify-content:center;align-items:center;width:16px;height:16px;display:inline-flex}
-.mcf-panel{box-sizing:border-box;border:.5px solid var(--dsw-alias-settings-card-stroke);border-top:none;background:var(--dsw-alias-settings-card-fill);border-bottom-left-radius:var(--dsw-radius-xl);border-bottom-right-radius:var(--dsw-radius-xl);flex-direction:column;gap:12px;padding:12px 14px 14px;display:flex}
+.mcf-panel{box-sizing:border-box;border:none;background:var(--dsw-alias-settings-card-fill);border-bottom-left-radius:var(--dsw-radius-xl);border-bottom-right-radius:var(--dsw-radius-xl);flex-direction:column;gap:12px;padding:12px 14px 14px;display:flex}
 .mcf-panelHead{justify-content:space-between;align-items:center;gap:12px;display:flex}
 .mcf-panelTitle{color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:500;line-height:18px;letter-spacing:.04em;text-transform:uppercase}
 .mcf-models{flex-direction:column;gap:8px;margin:0;padding:0;list-style:none;display:flex}
@@ -566,11 +578,12 @@ window.__ModuleLoader__.load({
 			}, open ? h("path", { d: "M4 6.5l4 4 4-4" }) : h("path", { d: "M6.5 4l4 4-4 4" }));
 		}
 
-		/** Refresh glyph for the page toolbar. */
-		function RefreshIcon(_props: SlotProps) {
+		/** Refresh glyph for the page toolbar; spins while a load is in flight. */
+		function RefreshIcon(props: SlotProps) {
 			return h("svg", {
 				viewBox: "0 0 16 16", width: 15, height: 15, fill: "none", stroke: "currentColor",
-				strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true"
+				strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true",
+				className: props.spin === true ? "mcf-spin" : undefined
 			}, h("path", { d: "M13.5 8a5.5 5.5 0 1 1-1.7-3.9" }), h("path", { d: "M13.5 2.6v3.2h-3.2" }));
 		}
 
@@ -620,6 +633,8 @@ window.__ModuleLoader__.load({
 					const [state, setState] = React.useState<PageState>({
 						status: "loading",
 						error: null,
+						refreshing: true,
+						updatedAt: null,
 						writable: false,
 						rows: [],
 						namespaces: new Map()
@@ -638,6 +653,7 @@ window.__ModuleLoader__.load({
 						const mine = ++generation.current;
 						setState((previous) => ({
 							...previous,
+							refreshing: true,
 							status: previous.rows.length > 0 ? previous.status : "loading"
 						}));
 						try {
@@ -654,13 +670,15 @@ window.__ModuleLoader__.load({
 							setState({
 								status: "ready",
 								error: null,
+								refreshing: false,
+								updatedAt: new Date().toLocaleTimeString(),
 								writable: view.writable === true,
 								rows: buildRows(registered.value, declared.value, view),
 								namespaces: new Map(view.namespaces.map((namespace) => [namespace.ns, namespace]))
 							});
 						} catch (error) {
 							if (mine !== generation.current) return;
-							setState((previous) => ({ ...previous, status: "error", error: messageOf(error) }));
+							setState((previous) => ({ ...previous, status: "error", refreshing: false, error: messageOf(error) }));
 						}
 					}, []);
 
@@ -924,14 +942,19 @@ window.__ModuleLoader__.load({
 							),
 							h("div", { className: "mcf-toolbar" },
 								typeof renderSlot === "function" ? renderSlot("model-config.action", {}) : null,
+								state.updatedAt === null ? null : h("span", {
+									className: "mcf-updated",
+									role: "status"
+								}, fill(t("updated"), { time: state.updatedAt })),
 								h("button", {
 									type: "button",
 									className: "mcf-btn mcf-iconBtn",
-									"aria-label": t("refresh"),
-									title: t("refresh"),
-									disabled: loading,
+									"aria-label": state.refreshing ? t("refreshing") : t("refresh"),
+									title: state.refreshing ? t("refreshing") : t("refresh"),
+									"aria-busy": state.refreshing,
+									disabled: state.refreshing,
 									onClick: load
-								}, h(RefreshIcon))
+								}, h(RefreshIcon, { spin: state.refreshing }))
 							)
 						),
 						loading ? h("p", { className: "mcf-status", role: "status" }, t("loading")) : null,
