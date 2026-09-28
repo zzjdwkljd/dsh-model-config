@@ -207,8 +207,12 @@ async function probeModel(ctx: HostContext, provider: string, model: string): Pr
 	}
 }
 
-/** Required Host services; the row stays inactive without them. */
-export const inject = ["llm", "webServer"];
+/**
+ * Required Host services; the row stays inactive without them.
+ * `connection` must be listed: the context proxy refuses to resolve a service
+ * the fiber never injected, so the trust gate below cannot be reached without it.
+ */
+export const inject = ["llm", "webServer", "connection"];
 
 /** Register the probe route for the lifetime of the plugin. */
 export function apply(ctx: HostContext): void {
