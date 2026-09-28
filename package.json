@@ -1,0 +1,35 @@
+{
+  "name": "@local/model-config",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sidebar Model configuration page: provider accordion, manual model add, connectivity test and a per-model vision switch",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "icon": "./icon.svg",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-api-remotes"
+      ]
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "@types/react": "^18.3.31",
+    "typescript": "^5.9.3"
+  }
+}

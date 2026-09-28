@@ -1,0 +1,3 @@
+- insert:
+    - id: model-config
+      name: '@local/model-config'

@@ -1,0 +1,23 @@
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"lib": ["ES2022", "DOM", "DOM.Iterable"],
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"types": ["node", "react"],
+		"strict": true,
+		"alwaysStrict": false,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
+		"noFallthroughCasesInSwitch": true,
+		"allowUnreachableCode": false,
+		"forceConsistentCasingInFileNames": true,
+		"skipLibCheck": true,
+		"rootDir": "src",
+		"outDir": ".",
+		"newLine": "lf",
+		"removeComments": false
+	},
+	"include": ["src/**/*.ts"],
+	"exclude": ["node_modules"]
+}
