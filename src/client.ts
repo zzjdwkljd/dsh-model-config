@@ -100,9 +100,15 @@ interface SettingsRemote {
 	): Promise<RemoteResult<SettingsNamespaceView>>;
 }
 
+/** The credential store: named secret references keyed by `deriveKeyRef`. */
+interface CredentialsRemote {
+	set(ref: string, value: string): Promise<RemoteResult<unknown>>;
+}
+
 interface RemoteService {
 	readonly llm: LlmRemote;
 	readonly settings: SettingsRemote;
+	readonly credentials?: CredentialsRemote;
 	$on?(event: string, listener: () => void): () => void;
 }
 
@@ -304,7 +310,25 @@ window.__ModuleLoader__.load({
 			deleteProviderTitle: "Delete this provider?",
 			deleteProviderBody: "{provider} and its {count} models will be removed from your profile configuration. This cannot be undone.",
 			delete: "Delete",
-			close: "Close"
+			close: "Close",
+			addProvider: "Add provider",
+			newProviderTitle: "New provider",
+			addProviderHint: "Once created it appears below like any other provider — every model supports testing and vision.",
+			providerRoute: "Provider ID",
+			providerRouteHint: "Lowercase letters, digits and dashes; starts with a letter. Becomes the key under providers.",
+			providerRouteInvalid: "The ID may only use lowercase letters, digits and dashes, and must start with a letter.",
+			routeTaken: "This ID is already used in this namespace.",
+			providerName: "Display name (optional)",
+			protocol: "API protocol",
+			baseURLLabel: "Base URL",
+			baseURLRequired: "A Base URL is required.",
+			baseURLInvalid: "The Base URL must be an http(s) address.",
+			apiKeyLabel: "API key (optional)",
+			apiKeyHint: "Stored under the reference {ref}, derived from the provider ID.",
+			addModelRow: "Add a model",
+			removeRow: "Remove",
+			needOneModel: "Add at least one model.",
+			create: "Create"
 		};
 
 		/** Chinese strings. */
@@ -354,7 +378,25 @@ window.__ModuleLoader__.load({
 			deleteProviderTitle: "删除该品牌商？",
 			deleteProviderBody: "将从 profile 配置中移除 {provider} 及其 {count} 个模型，无法撤销。",
 			delete: "删除",
-			close: "关闭"
+			close: "关闭",
+			addProvider: "新增提供商",
+			newProviderTitle: "新增提供商",
+			addProviderHint: "创建后它会像其他提供商一样出现在列表里，每个模型都可测试连通、打开识图。",
+			providerRoute: "提供商 ID",
+			providerRouteHint: "小写字母、数字和中划线，字母开头；将作为 providers 下的键名。",
+			providerRouteInvalid: "ID 只能使用小写字母、数字和中划线，且以字母开头。",
+			routeTaken: "该 ID 在此命名空间中已被使用。",
+			providerName: "显示名称（可留空）",
+			protocol: "接口协议",
+			baseURLLabel: "Base URL",
+			baseURLRequired: "请填写 Base URL。",
+			baseURLInvalid: "Base URL 必须是 http(s) 地址。",
+			apiKeyLabel: "API Key（可选）",
+			apiKeyHint: "密钥将按提供商 ID 派生的引用名 {ref} 保存。",
+			addModelRow: "添加一个模型",
+			removeRow: "移除",
+			needOneModel: "至少填写一个模型。",
+			create: "创建"
 		};
 
 		/** Component-local styles; unmounting the page removes them with it. */
@@ -453,6 +495,15 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
 .mcf-confirmText{margin:0;color:var(--mcf-text-2);font-size:13px;line-height:20px}
 .mcf-testRow{flex-wrap:wrap;align-items:center;gap:10px;min-height:24px;display:flex}
 .mcf-modalHint{color:var(--mcf-text-3);font-size:12px;line-height:18px}
+.mcf-formGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mcf-span2{grid-column:1/-1}
+.mcf-fieldHint{color:var(--mcf-text-3);font-size:11px;line-height:15px}
+.mcf-modelRows{display:flex;flex-direction:column;gap:8px}
+.mcf-modelRow{display:grid;grid-template-columns:1.2fr 1fr auto 32px;gap:8px;align-items:center}
+.mcf-rowCheck{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mcf-text-2);white-space:nowrap;cursor:pointer}
+.mcf-check{width:14px;height:14px;margin:0;accent-color:var(--mcf-accent);cursor:pointer}
+.mcf-addRowWrap{margin-top:10px}
+select.mcf-input{appearance:auto;height:34px}
 @media (prefers-reduced-motion:reduce){.mcf-spin,.mcf-overlay,.mcf-modal{animation:none}.mcf-group,.mcf-group::before,.mcf-chevron svg,.mcf-panelWrap,.mcf-switch,.mcf-switchThumb,.mcf-model,.mcf-btn,.mcf-input{transition:none}}
 `;
 
@@ -516,6 +567,91 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
 			return asModelRows(getPath(namespace.base, [...settingsPath, "models"])) ?? [];
 		}
 
+		/** Wire protocols a hand-declared route may speak, as the official page names them. */
+		const KNOWN_PROTOCOLS: readonly string[] = ["openai-completions", "openai-responses", "anthropic-messages"];
+
+		/** A route id the pi-ai adapter accepts, same rule the Models page enforces. */
+		const ROUTE_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+
+		/**
+		 * The credential reference a new route will use, derived exactly the way the
+		 * Models settings page derives it (`ZAI-CODING-CN` → `ZAI_CODING_CN_API_KEY`).
+		 * @param route - the provider route id.
+		 * @returns the reference name to store the key under.
+		 */
+		function deriveKeyRef(route: string): string {
+			return `${route.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}_API_KEY`;
+		}
+
+		/**
+		 * Whether the value points at an http(s) endpoint.
+		 * @param value - the candidate Base URL.
+		 * @returns true when URL-parsable with an http(s) protocol.
+		 */
+		function isHttpUrl(value: string): boolean {
+			try {
+				const protocol = new URL(value).protocol;
+				return protocol === "http:" || protocol === "https:";
+			} catch {
+				return false;
+			}
+		}
+
+		/**
+		 * The route ids already declared under a namespace's `providers` map.
+		 * @param namespace - the namespace view to inspect.
+		 * @returns the existing route keys, effective values first.
+		 */
+		function providerRoutesOf(namespace: SettingsNamespaceView | undefined): string[] {
+			if (namespace === undefined) return [];
+			for (const source of [namespace.value, namespace.base]) {
+				const providers = getPath(source, ["providers"]);
+				if (isRecord(providers)) return Object.keys(providers);
+			}
+			return [];
+		}
+
+		/**
+		 * Protocol choices for a hand-declared route: what sibling providers already
+		 * speak first, then the protocols the official page knows, deduplicated.
+		 * @param namespace - the namespace view to inspect.
+		 * @returns the identifiers a select should offer.
+		 */
+		function protocolChoicesOf(namespace: SettingsNamespaceView | undefined): string[] {
+			const choices: string[] = [];
+			for (const source of [namespace?.value, namespace?.base]) {
+				const providers = getPath(source, ["providers"]);
+				if (!isRecord(providers)) continue;
+				for (const profile of Object.values(providers)) {
+					if (!isRecord(profile)) continue;
+					const api = profile.api;
+					if (typeof api === "string" && api.length > 0 && !choices.includes(api)) choices.push(api);
+				}
+			}
+			for (const known of KNOWN_PROTOCOLS) {
+				if (!choices.includes(known)) choices.push(known);
+			}
+			return choices;
+		}
+
+		/** One model row inside the new-provider draft. */
+		interface NewModelDraft {
+			id: string;
+			name: string;
+			vision: boolean;
+		}
+
+		/** Everything the new-provider dialog collects before the first write. */
+		interface NewProviderDraft {
+			ns: string;
+			route: string;
+			displayName: string;
+			protocol: string;
+			baseURL: string;
+			apiKey: string;
+			models: NewModelDraft[];
+		}
+
 		/**
 		 * Join the declared configurable directory with the live routes, the same
 		 * order the Models settings page uses: account first, official second.
@@ -523,8 +659,7 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
 		 * @param declared - declared configurable providers in declaration order.
 		 * @param nameOf - locale-aware display-name resolver, supplied by the page.
 		 * @returns one row per provider, deduplicated by route id.
-		 */
-		function joinDirectory(
+		 */		function joinDirectory(
 			registered: readonly LlmProviderInfo[],
 			declared: readonly LlmConfigurableProvider[],
 			nameOf: (provider: string, fallback: string) => string
@@ -772,6 +907,9 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
 					const [rowError, setRowError] = React.useState<Record<string, string | undefined>>({});
 					const [modalTest, setModalTest] = React.useState<TestState | null>(null);
 					const [confirming, setConfirming] = React.useState<ConfirmTarget | null>(null);
+					const [creating, setCreating] = React.useState<NewProviderDraft | null>(null);
+					const [createError, setCreateError] = React.useState<string | null>(null);
+					const [createBusy, setCreateBusy] = React.useState(false);
 					const [, setLocaleTick] = React.useState(0);
 					const generation = React.useRef(0);
 
@@ -919,6 +1057,139 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
 						setAdding(null);
 						setAddError(null);
 						setModalTest(null);
+					};
+
+					/**
+					 * Open the new-provider dialog over the first namespace whose schema
+					 * hosts a `providers` map — in practice the pi-ai namespace.
+					 */
+					const startCreate = (): void => {
+						const eligible = [...state.namespaces.values()].filter((namespace) =>
+							isRecord(getPath(namespace.value, ["providers"])) || isRecord(getPath(namespace.base, ["providers"]))
+						);
+						const target = eligible[0];
+						if (target === undefined) return;
+						setCreateError(null);
+						setCreating({
+							ns: target.ns,
+							route: "",
+							displayName: "",
+							protocol: protocolChoicesOf(target)[0] ?? "",
+							baseURL: "",
+							apiKey: "",
+							models: [{ id: "", name: "", vision: true }]
+						});
+					};
+
+					/** Close the new-provider dialog. */
+					const closeCreate = (): void => {
+						setCreating(null);
+						setCreateError(null);
+					};
+
+					/** Patch one field of the new-provider draft. */
+					const patchCreate = (patch: Partial<NewProviderDraft>): void => {
+						setCreating((current) => (current === null ? current : { ...current, ...patch }));
+					};
+
+					/** Patch one model row of the new-provider draft. */
+					const patchCreateModel = (index: number, patch: Partial<NewModelDraft>): void => {
+						setCreating((current) => {
+							if (current === null) return current;
+							return {
+								...current,
+								models: current.models.map((model, at) => (at === index ? { ...model, ...patch } : model))
+							};
+						});
+					};
+
+					/**
+					 * Write the new provider's profile at ["providers", route] in one set
+					 * op — the same shape and location the shipped Models page writes —
+					 * then store the typed key under the derived reference when given.
+					 */
+					const submitCreate = async (): Promise<void> => {
+						const current = creating;
+						if (current === null) return;
+						const namespace = state.namespaces.get(current.ns);
+						const route = current.route.trim();
+						const baseURL = current.baseURL.trim();
+						const models = current.models
+							.map((model) => ({ ...model, id: model.id.trim(), name: model.name.trim() }))
+							.filter((model) => model.id.length > 0);
+						if (!ROUTE_PATTERN.test(route)) {
+							setCreateError(t("providerRouteInvalid"));
+							return;
+						}
+						if (providerRoutesOf(namespace).includes(route)) {
+							setCreateError(t("routeTaken"));
+							return;
+						}
+						if (baseURL.length === 0) {
+							setCreateError(t("baseURLRequired"));
+							return;
+						}
+						if (!isHttpUrl(baseURL)) {
+							setCreateError(t("baseURLInvalid"));
+							return;
+						}
+						if (models.length === 0) {
+							setCreateError(t("needOneModel"));
+							return;
+						}
+						const seen = new Set<string>();
+						for (const model of models) {
+							if (seen.has(model.id)) {
+								setCreateError(fill(t("idDuplicate"), { id: model.id }));
+								return;
+							}
+							seen.add(model.id);
+						}
+						if (namespace === undefined) {
+							setCreateError(t("noNamespace"));
+							return;
+						}
+						setCreateBusy(true);
+						setCreateError(null);
+						try {
+							const profile: Record<string, JsonValue> = {
+								api: current.protocol,
+								baseURL,
+								models: models.map((model) => ({
+									id: model.id,
+									...(model.name.length > 0 ? { name: model.name } : {}),
+									input: model.vision ? ["text", "image"] : ["text"]
+								}))
+							};
+							if (current.displayName.trim().length > 0) profile.displayName = current.displayName.trim();
+							if (current.apiKey.trim().length > 0) profile.apiKeyEnv = deriveKeyRef(route);
+							const response = await ctx.remote.settings.mutate(
+								current.ns,
+								[{ op: "set", path: ["providers", route], value: profile }],
+								namespace.revision
+							);
+							if (!response.ok) {
+								setCreateError(response.error.code === "settings/conflict" ? t("conflict") : response.error.message);
+								if (response.error.code === "settings/conflict") await load();
+								return;
+							}
+							const key = current.apiKey.trim();
+							if (key.length > 0 && ctx.remote.credentials !== undefined) {
+								const stored = await ctx.remote.credentials.set(deriveKeyRef(route), key);
+								if (!stored.ok) {
+									/*
+									 * The profile landed; only the key write failed. Surface it
+									 * on the fresh row and keep the dialog's work done.
+									 */
+									setRowError((previous) => ({ ...previous, [route]: stored.error.message }));
+								}
+							}
+							setCreating(null);
+							setCreateError(null);
+							await load();
+						} finally {
+							setCreateBusy(false);
+						}
 					};
 
 					/** Probe the id currently typed in the dialog, before it is saved. */
@@ -1190,6 +1461,199 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
 							);
 						}
 
+						if (creating !== null) {
+							const draftProvider = creating;
+							const namespace = state.namespaces.get(draftProvider.ns);
+							const routes = providerRoutesOf(namespace);
+							const route = draftProvider.route.trim();
+							const baseURL = draftProvider.baseURL.trim();
+							const filled = draftProvider.models.filter((model) => model.id.trim().length > 0);
+							const routeInvalid = route.length > 0 && !ROUTE_PATTERN.test(route);
+							const routeTaken = route.length > 0 && routes.includes(route);
+							const baseURLInvalid = baseURL.length > 0 && !isHttpUrl(baseURL);
+							const duplicate = (() => {
+								const seen = new Set<string>();
+								for (const model of filled) {
+									if (seen.has(model.id)) return model.id;
+									seen.add(model.id);
+								}
+								return null;
+							})();
+							const ready = route.length > 0 && !routeInvalid && !routeTaken
+								&& baseURL.length > 0 && !baseURLInvalid
+								&& filled.length > 0 && duplicate === null
+								&& draftProvider.protocol.length > 0 && !createBusy;
+							return h("div", {
+								className: "mcf-overlay",
+								onClick: (event: import("react").MouseEvent<HTMLDivElement>) => {
+									if (event.target === event.currentTarget) closeCreate();
+								}
+							},
+								h("div", {
+									className: "mcf-modal",
+									role: "dialog",
+									"aria-modal": "true",
+									"aria-labelledby": "mcf-create-title"
+								},
+									h("div", { className: "mcf-modalHead" },
+										h("div", null,
+											h("h2", { className: "mcf-modalTitle", id: "mcf-create-title" }, t("newProviderTitle")),
+											h("p", { className: "mcf-modalSub" }, t("addProviderHint"))
+										),
+										h("button", {
+											type: "button",
+											className: "mcf-btn mcf-btnSm mcf-iconBtn",
+											"aria-label": t("close"),
+											title: t("close"),
+											onClick: closeCreate
+										}, h(CloseIcon, {}))
+									),
+									h("div", { className: "mcf-modalBody" },
+										h("div", { className: "mcf-formGrid" },
+											h("label", { className: "mcf-field" },
+												h("span", null, t("providerRoute")),
+												h("input", {
+													className: "mcf-input",
+													type: "text",
+													value: draftProvider.route,
+													autoFocus: true,
+													spellCheck: false,
+													"aria-invalid": routeInvalid || routeTaken,
+													placeholder: "my-relay",
+													onChange: (event: import("react").ChangeEvent<HTMLInputElement>) =>
+														patchCreate({ route: event.target.value })
+												}),
+												h("span", { className: "mcf-fieldHint" }, t("providerRouteHint"))
+											),
+											h("label", { className: "mcf-field" },
+												h("span", null, t("providerName")),
+												h("input", {
+													className: "mcf-input",
+													type: "text",
+													value: draftProvider.displayName,
+													onChange: (event: import("react").ChangeEvent<HTMLInputElement>) =>
+														patchCreate({ displayName: event.target.value })
+												})
+											),
+											h("label", { className: "mcf-field" },
+												h("span", null, t("protocol")),
+												h("select", {
+													className: "mcf-input",
+													value: draftProvider.protocol,
+													onChange: (event: import("react").ChangeEvent<HTMLSelectElement>) =>
+														patchCreate({ protocol: event.target.value })
+												}, protocolChoicesOf(namespace).map((choice) =>
+													h("option", { key: choice, value: choice }, choice)
+												))
+											),
+											h("label", { className: "mcf-field" },
+												h("span", null, t("baseURLLabel")),
+												h("input", {
+													className: "mcf-input",
+													type: "text",
+													value: draftProvider.baseURL,
+													spellCheck: false,
+													"aria-invalid": baseURLInvalid,
+													placeholder: "https://api.example.com/v1",
+													onChange: (event: import("react").ChangeEvent<HTMLInputElement>) =>
+														patchCreate({ baseURL: event.target.value })
+												})
+											),
+											h("label", { className: "mcf-field mcf-span2" },
+												h("span", null, t("apiKeyLabel")),
+												h("input", {
+													className: "mcf-input",
+													type: "password",
+													value: draftProvider.apiKey,
+													spellCheck: false,
+													placeholder: draftProvider.route.length > 0
+														? deriveKeyRef(draftProvider.route.trim())
+														: undefined,
+													onChange: (event: import("react").ChangeEvent<HTMLInputElement>) =>
+														patchCreate({ apiKey: event.target.value })
+												}),
+												draftProvider.route.trim().length === 0 || draftProvider.apiKey.trim().length === 0
+													? null
+													: h("span", { className: "mcf-fieldHint" },
+														fill(t("apiKeyHint"), { ref: deriveKeyRef(route) }))
+											)
+										),
+										h("p", { className: "mcf-panelTitle", style: { marginTop: "16px" } }, t("models")),
+										h("div", { className: "mcf-modelRows" },
+											draftProvider.models.map((model, index) =>
+												h("div", { className: "mcf-modelRow", key: index },
+													h("input", {
+														className: "mcf-input",
+														type: "text",
+														value: model.id,
+														spellCheck: false,
+														placeholder: t("modelId"),
+														"aria-label": t("modelId"),
+														onChange: (event: import("react").ChangeEvent<HTMLInputElement>) =>
+															patchCreateModel(index, { id: event.target.value })
+													}),
+													h("input", {
+														className: "mcf-input",
+														type: "text",
+														value: model.name,
+														placeholder: t("modelName"),
+														"aria-label": t("modelName"),
+														onChange: (event: import("react").ChangeEvent<HTMLInputElement>) =>
+															patchCreateModel(index, { name: event.target.value })
+													}),
+													h("label", { className: "mcf-rowCheck" },
+														h("input", {
+															className: "mcf-check",
+															type: "checkbox",
+															checked: model.vision,
+															onChange: (event: import("react").ChangeEvent<HTMLInputElement>) =>
+																patchCreateModel(index, { vision: event.target.checked })
+														}),
+														t("vision")
+													),
+													draftProvider.models.length === 1
+														? null
+														: h("button", {
+															type: "button",
+															className: "mcf-btn mcf-btnSm mcf-iconBtn",
+															"aria-label": t("removeRow"),
+															title: t("removeRow"),
+															onClick: () => patchCreate({
+																models: draftProvider.models.filter((_, at) => at !== index)
+															})
+														}, h(CloseIcon, {}))
+												)
+											)
+										),
+										h("div", { className: "mcf-addRowWrap" },
+											h("button", {
+												type: "button",
+												className: "mcf-btn mcf-btnSm",
+												onClick: () => patchCreate({
+													models: [...draftProvider.models, { id: "", name: "", vision: true }]
+												})
+											}, t("addModelRow"))
+										),
+										createError === null ? null : h("p", { className: "mcf-error" }, createError)
+									),
+									h("div", { className: "mcf-modalFoot" },
+										h("button", {
+											type: "button",
+											className: "mcf-btn",
+											disabled: createBusy,
+											onClick: closeCreate
+										}, t("cancel")),
+										h("button", {
+											type: "button",
+											className: "mcf-btn mcf-btnPrimary",
+											disabled: !ready,
+											onClick: () => void submitCreate()
+										}, createBusy ? t("testing") : t("create"))
+									)
+								)
+							);
+						}
+
 						const row = adding === null
 							? undefined
 							: state.rows.find((candidate) => candidate.provider === adding);
@@ -1292,21 +1756,27 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
 
 					/* Escape closes whichever overlay is open, wherever focus happens to be. */
 					React.useEffect(() => {
-						if (adding === null && confirming === null) return;
+						if (adding === null && confirming === null && creating === null) return;
 						const onKey = (event: KeyboardEvent): void => {
 							if (event.key !== "Escape") return;
 							setConfirming(null);
 							setAdding(null);
 							setAddError(null);
 							setModalTest(null);
+							setCreating(null);
+							setCreateError(null);
 						};
 						document.addEventListener("keydown", onKey);
 						return () => document.removeEventListener("keydown", onKey);
-					}, [adding, confirming]);
+					}, [adding, confirming, creating]);
 
 					const loading = state.status === "loading" && state.rows.length === 0;
 					const failed = state.status === "error";
 					const renderSlot = props.renderSlot;
+					/* A provider can only be hand-declared where a `providers` map exists. */
+					const creatableView = state.writable && [...state.namespaces.values()].some((namespace) =>
+						isRecord(getPath(namespace.value, ["providers"])) || isRecord(getPath(namespace.base, ["providers"]))
+					);
 
 					return h("section", { className: "mcf-page", "aria-busy": loading },
 						h("style", null, MCF_CSS),
@@ -1317,6 +1787,11 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
 							),
 							h("div", { className: "mcf-toolbar" },
 								typeof renderSlot === "function" ? renderSlot("model-config.action", {}) : null,
+								creatableView ? h("button", {
+									type: "button",
+									className: "mcf-btn mcf-btnSm mcf-btnPrimary",
+									onClick: startCreate
+								}, t("addProvider")) : null,
 								state.updatedAt === null ? null : h("span", {
 									className: "mcf-updated",
 									role: "status"
