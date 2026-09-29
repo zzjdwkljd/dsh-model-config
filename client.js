@@ -67,6 +67,7 @@ window.__ModuleLoader__.load({
             deleteModel: "Delete model",
             deleteProvider: "Delete provider",
             deleteModelTitle: "Delete this model?",
+            lastModelGuard: "A hand-declared provider must keep at least one model. To remove the whole provider, use Delete provider on its card.",
             deleteModelBody: "{model} will be removed from {provider}. This writes to your profile configuration and cannot be undone.",
             deleteProviderTitle: "Delete this provider?",
             deleteProviderBody: "{provider} and its {count} models will be removed from your profile configuration. This cannot be undone.",
@@ -153,6 +154,7 @@ window.__ModuleLoader__.load({
             deleteModel: "删除模型",
             deleteProvider: "删除品牌商",
             deleteModelTitle: "删除该模型？",
+            lastModelGuard: "手动声明的提供商至少要保留一个模型；要删除整个提供商，请用卡片上的「删除品牌商」。",
             deleteModelBody: "将从 {provider} 中移除 {model}。该操作会写入你的 profile 配置，无法撤销。",
             deleteProviderTitle: "删除该品牌商？",
             deleteProviderBody: "将从 profile 配置中移除 {provider} 及其 {count} 个模型，无法撤销。",
@@ -926,6 +928,17 @@ select.mcf-input{appearance:auto;height:34px}
                             return t("protocolAnthropicMessages");
                         return identifier;
                     };
+                    /**
+                     * Map the adapter's English validation failures onto the page's
+                     * language; anything unrecognized passes through untouched.
+                     */
+                    const translateRowError = (message) => {
+                        if (message === undefined)
+                            return undefined;
+                        if (message.includes("resolves no models"))
+                            return t("lastModelGuard");
+                        return message;
+                    };
                     /** Patch one field of the new-provider draft; endpoint edits un-pass the probe. */
                     const patchCreate = (patch) => {
                         if (patch.baseURL !== undefined || patch.apiKey !== undefined || patch.protocol !== undefined) {
@@ -1231,8 +1244,11 @@ select.mcf-input{appearance:auto;height:34px}
                         }, testing ? t("testing") : t("test")), editable ? h("button", {
                             type: "button",
                             className: "mcf-btn mcf-btnSm mcf-iconBtn mcf-iconDanger",
-                            disabled: busy[row.provider] === true,
-                            title: t("deleteModel"),
+                            disabled: busy[row.provider] === true
+                                || (row.settingsPath.length > 0 && row.models.length <= 1),
+                            title: row.settingsPath.length > 0 && row.models.length <= 1
+                                ? t("lastModelGuard")
+                                : t("deleteModel"),
                             "aria-label": `${t("deleteModel")} ${id}`,
                             onClick: () => setConfirming({
                                 kind: "model",
@@ -1268,9 +1284,9 @@ select.mcf-input{appearance:auto;height:34px}
                             className: "mcf-btn mcf-btnSm mcf-btnPrimary",
                             disabled: busy[row.provider] === true,
                             onClick: () => startAdd(row)
-                        }, t("addModel")) : null)), row.editable ? null : h("p", { className: "mcf-notice" }, t("notEditable")), row.editable && !state.writable ? h("p", { className: "mcf-notice" }, t("readOnly")) : null, row.directoryError === undefined ? null : h("p", { className: "mcf-error" }, row.directoryError), row.models.length === 0
+                        }, t("addModel")) : null)), row.editable ? null : h("p", { className: "mcf-notice" }, t("notEditable")), row.editable && !state.writable ? h("p", { className: "mcf-notice" }, t("readOnly")) : null, row.directoryError === undefined ? null : h("p", { className: "mcf-error" }, translateRowError(row.directoryError)), row.models.length === 0
                             ? h("p", { className: "mcf-status" }, t("modelsEmpty"))
-                            : h("ul", { className: "mcf-models" }, row.models.map((model, index) => renderModel(row, model, index))), rowError[row.provider] === undefined ? null : h("p", { className: "mcf-error" }, rowError[row.provider]));
+                            : h("ul", { className: "mcf-models" }, row.models.map((model, index) => renderModel(row, model, index))), rowError[row.provider] === undefined ? null : h("p", { className: "mcf-error" }, translateRowError(rowError[row.provider])));
                     };
                     const renderProvider = (row, index) => {
                         const open = openId === row.provider;
@@ -1304,7 +1320,7 @@ select.mcf-input{appearance:auto;height:34px}
                         if (confirming !== null) {
                             const target = confirming;
                             const row = state.rows.find((candidate) => candidate.provider === target.provider);
-                            const error = rowError[target.provider];
+                            const error = translateRowError(rowError[target.provider]);
                             return h("div", {
                                 className: "mcf-overlay",
                                 onClick: (event) => {
@@ -1561,7 +1577,7 @@ select.mcf-input{appearance:auto;height:34px}
                         const id = draft.id.trim();
                         const testing = modalTest !== null && modalTest.status === "testing";
                         const canTest = row.active && id.length > 0 && !testing;
-                        const error = addError ?? rowError[row.provider];
+                        const error = addError ?? translateRowError(rowError[row.provider]);
                         return h("div", {
                             className: "mcf-overlay",
                             onClick: (event) => {
