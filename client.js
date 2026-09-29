@@ -78,6 +78,7 @@ window.__ModuleLoader__.load({
             probing: "Checking reachability…",
             skipProbe: "Skip the reachability check and create anyway (other checks still apply)",
             createdFlash: "Provider {provider} created.",
+            keyStoreFailed: "The provider is created, but storing the API key failed: {message}",
             providerRoute: "Provider ID",
             providerRouteHint: "Lowercase letters, digits and dashes; starts with a letter. Becomes the key under providers.",
             providerRouteInvalid: "The ID may only use lowercase letters, digits and dashes, and must start with a letter.",
@@ -163,6 +164,7 @@ window.__ModuleLoader__.load({
             probing: "正在检查连通…",
             skipProbe: "跳过连通性检查，仍然创建（其他校验仍会生效）",
             createdFlash: "已创建提供商 {provider}。",
+            keyStoreFailed: "提供商已创建，但密钥保存失败：{message}",
             providerRoute: "提供商 ID",
             providerRouteHint: "小写字母、数字和中划线，字母开头；将作为 providers 下的键名。",
             providerRouteInvalid: "ID 只能使用小写字母、数字和中划线，且以字母开头。",
@@ -283,6 +285,8 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
 @keyframes mcf-fade{from{opacity:0}to{opacity:1}}
 @keyframes mcf-rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .mcf-modal{box-sizing:border-box;width:100%;max-width:460px;background:var(--mcf-surface);border:1px solid var(--mcf-border);border-radius:16px;box-shadow:0 16px 40px #18181B26;flex-direction:column;display:flex;animation:mcf-rise 160ms ease-out}
+.mcf-modalFixed{height:min(640px,calc(100vh - 96px))}
+.mcf-modalFixed .mcf-modalBody{flex:1 1 auto;min-height:0;overflow:auto}
 .mcf-modalHead{justify-content:space-between;align-items:flex-start;gap:12px;padding:18px 18px 0;display:flex}
 .mcf-modalTitle{margin:0;color:var(--mcf-text);font-size:15px;font-weight:600;line-height:22px}
 .mcf-modalSub{margin:2px 0 0;color:var(--mcf-text-3);font-size:12px;line-height:18px}
@@ -635,7 +639,7 @@ select.mcf-input{appearance:auto;height:34px}
             }
         }
         return {
-            inject: ["slots", "locale", "remote", "remote.llm", "remote.settings"],
+            inject: ["slots", "locale", "remote", "remote.llm", "remote.settings", "remote.credentials"],
             apply(ctx) {
                 ctx.effect(() => ctx.locale.register(NS, { zh, en }), "model-config: dictionaries");
                 const t = ctx.locale.bind(NS);
@@ -1101,21 +1105,34 @@ select.mcf-input{appearance:auto;height:34px}
                                     await load();
                                 return;
                             }
-                            const key = current.apiKey.trim();
-                            if (ctx.remote.credentials !== undefined) {
-                                const stored = await ctx.remote.credentials.set(deriveKeyRef(route), key);
-                                if (!stored.ok) {
-                                    /*
-                                     * The profile landed; only the key write failed. Surface it
-                                     * on the fresh row and keep the dialog's work done.
-                                     */
-                                    setRowError((previous) => ({ ...previous, [route]: stored.error.message }));
-                                }
-                            }
+                            /*
+                             * The profile landed — close the dialog FIRST. The key write is
+                             * best-effort from here: whether it answers an error shape or
+                             * throws outright, it must never trap the dialog open again.
+                             */
                             setCreating(null);
                             setCreateError(null);
                             setCreateAttempted(false);
                             setFlash(fill(t("createdFlash"), { provider: route }));
+                            const key = current.apiKey.trim();
+                            if (key.length > 0 && ctx.remote.credentials !== undefined) {
+                                try {
+                                    const stored = await ctx.remote.credentials.set(deriveKeyRef(route), key);
+                                    if (!stored.ok) {
+                                        setRowError((previous) => ({
+                                            ...previous,
+                                            [route]: fill(t("keyStoreFailed"), { message: stored.error.message })
+                                        }));
+                                    }
+                                }
+                                catch (error) {
+                                    const message = error instanceof Error ? error.message : String(error);
+                                    setRowError((previous) => ({
+                                        ...previous,
+                                        [route]: fill(t("keyStoreFailed"), { message })
+                                    }));
+                                }
+                            }
                             await load();
                         }
                         finally {
@@ -1377,7 +1394,7 @@ select.mcf-input{appearance:auto;height:34px}
                                         closeCreate();
                                 }
                             }, h("div", {
-                                className: "mcf-modal",
+                                className: "mcf-modal mcf-modalFixed",
                                 role: "dialog",
                                 "aria-modal": "true",
                                 "aria-labelledby": "mcf-create-title"
