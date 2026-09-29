@@ -55,6 +55,9 @@ window.__ModuleLoader__.load({
             vision: "Vision",
             visionOn: "Vision",
             visionLabel: "Vision for {model}",
+            reasoning: "Reasoning",
+            reasoningOn: "Reasoning",
+            reasoningLabel: "Reasoning effort for {model}",
             test: "Test",
             testing: "Testing…",
             testOk: "Connected — the model answered.",
@@ -75,7 +78,7 @@ window.__ModuleLoader__.load({
             close: "Close",
             addProvider: "Add provider",
             newProviderTitle: "New provider",
-            addProviderHint: "Once created it appears below like any other provider — every model supports testing and vision. Creation checks reachability first; if the check fails you can still create, skipping it.",
+            addProviderHint: "Once created it appears below like any other provider — every model supports testing, vision, and reasoning effort. Creation checks reachability first; if the check fails you can still create, skipping it.",
             probing: "Checking reachability…",
             skipProbe: "Skip the reachability check and create anyway (other checks still apply)",
             createdFlash: "Provider {provider} created.",
@@ -162,7 +165,10 @@ window.__ModuleLoader__.load({
             close: "关闭",
             addProvider: "新增提供商",
             newProviderTitle: "新增提供商",
-            addProviderHint: "创建后会像其他提供商一样出现在列表里，每个模型都可测试连通、打开识图。创建时会先检查接口能否连通，检查不过也可以选择跳过。",
+            addProviderHint: "创建后会像其他提供商一样出现在列表里，每个模型都可测试连通、打开识图、打开思考强度。创建时会先检查接口能否连通，检查不过也可以选择跳过。",
+            reasoning: "思考",
+            reasoningOn: "思考",
+            reasoningLabel: "思考强度（{model}）",
             probing: "正在检查连通…",
             skipProbe: "跳过连通性检查，仍然创建（其他校验仍会生效）",
             createdFlash: "已创建提供商 {provider}。",
@@ -382,6 +388,16 @@ select.mcf-input{appearance:auto;height:34px}
         }
         /** Wire protocols a hand-declared route may speak, as the official page names them. */
         const KNOWN_PROTOCOLS = ["openai-completions", "openai-responses", "anthropic-messages"];
+        /**
+         * The reasoning-effort map a hand-declared model gets when reasoning is
+         * switched on: off sends nothing, the three standard levels pass through
+         * under their OpenAI spellings, and the exotic levels stay unsupported.
+         */
+        const REASONING_EFFORTS_ON = { off: null, low: "low", medium: "medium", high: "high" };
+        /** Whether a model entry declares usable reasoning levels. */
+        const reasoningOnOf = (model) => typeof model.reasoningEfforts === "object"
+            && model.reasoningEfforts !== null
+            && !Array.isArray(model.reasoningEfforts);
         /** A route id the pi-ai adapter accepts, same rule the Models page enforces. */
         const ROUTE_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
         /**
@@ -819,6 +835,22 @@ select.mcf-input{appearance:auto;height:34px}
                         }
                         await commit(row, row.models.map((model, at) => at === index ? nextModel : model));
                     };
+                    /**
+                     * Turn reasoning effort on or off for exactly one model row of a
+                     * hand-declared provider. On writes the standard OpenAI-compatible
+                     * level map; off writes `false` so the adapter pins the model as
+                     * non-reasoning instead of falling back to catalog defaults.
+                     */
+                    const toggleReasoning = async (row, index) => {
+                        const source = row.models[index];
+                        if (source === undefined)
+                            return;
+                        const nextModel = { ...source };
+                        nextModel.reasoningEfforts = reasoningOnOf(source)
+                            ? false
+                            : { ...REASONING_EFFORTS_ON };
+                        await commit(row, row.models.map((model, at) => at === index ? nextModel : model));
+                    };
                     /** Append a hand-written model id to one provider's catalog. */
                     const submitAdd = async (row) => {
                         const id = draft.id.trim();
@@ -884,7 +916,7 @@ select.mcf-input{appearance:auto;height:34px}
                             protocol: protocolChoicesOf(target)[0] ?? "",
                             baseURL: "",
                             apiKey: "",
-                            models: [{ id: "", name: "", vision: true }]
+                            models: [{ id: "", name: "", vision: true, reasoning: false }]
                         });
                     };
                     /** Close the new-provider dialog. */
@@ -1013,7 +1045,8 @@ select.mcf-input{appearance:auto;height:34px}
                             .map((model) => ({
                             id: model.id,
                             name: typeof model.name === "string" ? model.name : "",
-                            vision: Array.isArray(model.inputModalities) && model.inputModalities.includes("image")
+                            vision: Array.isArray(model.inputModalities) && model.inputModalities.includes("image"),
+                            reasoning: false
                         }));
                         patchCreate({ models: [...current.models, ...additions] });
                         setCandidates(null);
@@ -1105,7 +1138,10 @@ select.mcf-input{appearance:auto;height:34px}
                                 models: models.map((model) => ({
                                     id: model.id,
                                     ...(model.name.length > 0 ? { name: model.name } : {}),
-                                    input: model.vision ? ["text", "image"] : ["text"]
+                                    input: model.vision ? ["text", "image"] : ["text"],
+                                    ...(model.reasoning
+                                        ? { reasoningEfforts: { ...REASONING_EFFORTS_ON } }
+                                        : { reasoningEfforts: false })
                                 }))
                             };
                             if (current.displayName.trim().length > 0)
@@ -1235,7 +1271,21 @@ select.mcf-input{appearance:auto;height:34px}
                             disabled: !editable || busy[row.provider] === true,
                             "aria-label": fill(t("visionLabel"), { model: id }),
                             onClick: () => void toggleVision(row, index)
-                        }, h("span", { className: "mcf-switchThumb" }))), h("button", {
+                        }, h("span", { className: "mcf-switchThumb" }))), row.settingsPath.length > 0 ? (() => {
+                            const reasoning = reasoningOnOf(model);
+                            return [
+                                reasoning ? h("span", { className: "mcf-tag", key: "rtag" }, t("reasoningOn")) : null,
+                                h("span", { className: "mcf-switchWrap", key: "rswitch" }, h("span", { className: "mcf-switchLabel" }, t("reasoning")), h("button", {
+                                    type: "button",
+                                    role: "switch",
+                                    "aria-checked": reasoning,
+                                    className: "mcf-switch",
+                                    disabled: !editable || busy[row.provider] === true,
+                                    "aria-label": fill(t("reasoningLabel"), { model: id }),
+                                    onClick: () => void toggleReasoning(row, index)
+                                }, h("span", { className: "mcf-switchThumb" })))
+                            ];
+                        })() : null, h("button", {
                             type: "button",
                             className: "mcf-btn mcf-btnSm",
                             disabled: testing || !row.active,
@@ -1488,7 +1538,12 @@ select.mcf-input{appearance:auto;height:34px}
                                 type: "checkbox",
                                 checked: model.vision,
                                 onChange: (event) => patchCreateModel(index, { vision: event.target.checked })
-                            }), t("vision")), draftProvider.models.length === 1
+                            }), t("vision")), h("label", { className: "mcf-rowCheck" }, h("input", {
+                                className: "mcf-check",
+                                type: "checkbox",
+                                checked: model.reasoning,
+                                onChange: (event) => patchCreateModel(index, { reasoning: event.target.checked })
+                            }), t("reasoning")), draftProvider.models.length === 1
                                 ? null
                                 : h("button", {
                                     type: "button",
@@ -1502,7 +1557,7 @@ select.mcf-input{appearance:auto;height:34px}
                                 type: "button",
                                 className: "mcf-btn mcf-btnSm",
                                 onClick: () => patchCreate({
-                                    models: [...draftProvider.models, { id: "", name: "", vision: true }]
+                                    models: [...draftProvider.models, { id: "", name: "", vision: true, reasoning: false }]
                                 })
                             }, t("addModelRow"))), modelsError === null ? null : h("p", { className: "mcf-fieldError" }, modelsError), fetchError === null ? null : h("p", { className: "mcf-error" }, fetchError), candidates === null ? null : h("div", { className: "mcf-candidates" }, h("div", { className: "mcf-candHead" }, h("input", {
                                 className: "mcf-input mcf-candSearch",
