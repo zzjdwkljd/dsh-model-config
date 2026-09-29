@@ -337,12 +337,12 @@ window.__ModuleLoader__.load({
 			newProviderTitle: "New provider",
 			addProviderHint: "Once created it appears below like any other provider — every model supports testing and vision. Creation checks reachability first; if the check fails you can still create, skipping it.",
 			probing: "Checking reachability…",
-			skipProbe: "Create anyway (skip the reachability check)",
+			skipProbe: "Skip the reachability check and create anyway (other checks still apply)",
 			createdFlash: "Provider {provider} created.",
 			providerRoute: "Provider ID",
 			providerRouteHint: "Lowercase letters, digits and dashes; starts with a letter. Becomes the key under providers.",
 			providerRouteInvalid: "The ID may only use lowercase letters, digits and dashes, and must start with a letter.",
-			routeTaken: "This ID is already used in this namespace.",
+			routeTaken: "This ID is already taken by a provider in the list. Pick another ID, or delete that provider first.",
 			providerName: "Display name (optional)",
 			protocol: "API protocol",
 			protocolOpenAiCompletions: "OpenAI-compatible",
@@ -423,12 +423,12 @@ window.__ModuleLoader__.load({
 			newProviderTitle: "新增提供商",
 			addProviderHint: "创建后会像其他提供商一样出现在列表里，每个模型都可测试连通、打开识图。创建时会先检查接口能否连通，检查不过也可以选择跳过。",
 			probing: "正在检查连通…",
-			skipProbe: "仍然创建（跳过连通性检查）",
+			skipProbe: "跳过连通性检查，仍然创建（其他校验仍会生效）",
 			createdFlash: "已创建提供商 {provider}。",
 			providerRoute: "提供商 ID",
 			providerRouteHint: "小写字母、数字和中划线，字母开头；将作为 providers 下的键名。",
 			providerRouteInvalid: "ID 只能使用小写字母、数字和中划线，且以字母开头。",
-			routeTaken: "该 ID 在此命名空间中已被使用。",
+			routeTaken: "该 ID 已被列表里已有的提供商占用。请换一个 ID，或先删除原来的卡片。",
 			providerName: "显示名称（可留空）",
 			protocol: "接口协议",
 			protocolOpenAiCompletions: "OpenAI 兼容接口",
@@ -569,6 +569,8 @@ select.mcf-input{appearance:auto;height:34px}
 .mcf-inputInvalid{border-color:var(--mcf-danger-line)!important}
 .mcf-inputInvalid:focus{border-color:var(--mcf-danger)!important;box-shadow:0 0 0 3px var(--mcf-danger-soft)}
 .mcf-skipRow{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--mcf-text-2);cursor:pointer}
+.mcf-pulse{animation:mcf-pulse 560ms ease-out}
+@keyframes mcf-pulse{0%{box-shadow:0 0 0 0 var(--mcf-danger-soft)}100%{box-shadow:0 0 0 8px transparent}}
 .mcf-candidates{margin-top:10px;border:1px solid var(--mcf-border);border-radius:10px;background:var(--mcf-surface);overflow:hidden}
 .mcf-candHead{display:flex;gap:8px;align-items:center;padding:8px;border-bottom:1px solid var(--mcf-border);background:var(--mcf-surface-hover)}
 .mcf-candSearch{flex:1;min-width:0}
@@ -578,7 +580,7 @@ select.mcf-input{appearance:auto;height:34px}
 .mcf-candRow:hover{background:var(--mcf-surface-hover)}
 .mcf-candId{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:var(--mcf-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mcf-candName{color:var(--mcf-text-3);flex-shrink:0}
-@media (prefers-reduced-motion:reduce){.mcf-spin,.mcf-overlay,.mcf-modal{animation:none}.mcf-group,.mcf-group::before,.mcf-chevron svg,.mcf-panelWrap,.mcf-switch,.mcf-switchThumb,.mcf-model,.mcf-btn,.mcf-input{transition:none}}
+@media (prefers-reduced-motion:reduce){.mcf-spin,.mcf-overlay,.mcf-modal,.mcf-pulse{animation:none}.mcf-group,.mcf-group::before,.mcf-chevron svg,.mcf-panelWrap,.mcf-switch,.mcf-switchThumb,.mcf-model,.mcf-btn,.mcf-input{transition:none}}
 `;
 
 		/** Render a translate result with `{name}` placeholders filled in. */
@@ -990,6 +992,8 @@ select.mcf-input{appearance:auto;height:34px}
 					const [probeBusy, setProbeBusy] = React.useState(false);
 					const [probeError, setProbeError] = React.useState<string | null>(null);
 					const [flash, setFlash] = React.useState<string | null>(null);
+					const [pulseTick, setPulseTick] = React.useState(0);
+					const [pulse, setPulse] = React.useState(false);
 
 					/* The creation-success note clears itself; no timer to manage by hand. */
 					React.useEffect(() => {
@@ -997,6 +1001,14 @@ select.mcf-input{appearance:auto;height:34px}
 						const timer = window.setTimeout(() => setFlash(null), 5000);
 						return () => window.clearTimeout(timer);
 					}, [flash]);
+
+					/* A failed submit briefly pulses the offending fields. */
+					React.useEffect(() => {
+						if (pulseTick === 0) return;
+						setPulse(true);
+						const timer = window.setTimeout(() => setPulse(false), 600);
+						return () => window.clearTimeout(timer);
+					}, [pulseTick]);
 					const [fetching, setFetching] = React.useState(false);
 					const [fetchError, setFetchError] = React.useState<string | null>(null);
 					const [candidates, setCandidates] = React.useState<LlmDiscoveredModel[] | null>(null);
@@ -1320,13 +1332,28 @@ select.mcf-input{appearance:auto;height:34px}
 						const models = current.models
 							.map((model) => ({ ...model, id: model.id.trim(), name: model.name.trim() }))
 							.filter((model) => model.id.length > 0);
-						if (!ROUTE_PATTERN.test(route) || providerRoutesOf(namespace).includes(route)) return;
-						if (baseURL.length === 0 || !isHttpUrl(baseURL)) return;
-						if (current.apiKey.trim().length === 0) return;
-						if (models.length === 0) return;
+						if (!ROUTE_PATTERN.test(route) || providerRoutesOf(namespace).includes(route)) {
+							setPulseTick((tick) => tick + 1);
+							return;
+						}
+						if (baseURL.length === 0 || !isHttpUrl(baseURL)) {
+							setPulseTick((tick) => tick + 1);
+							return;
+						}
+						if (current.apiKey.trim().length === 0) {
+							setPulseTick((tick) => tick + 1);
+							return;
+						}
+						if (models.length === 0) {
+							setPulseTick((tick) => tick + 1);
+							return;
+						}
 						const seen = new Set<string>();
 						for (const model of models) {
-							if (seen.has(model.id)) return;
+							if (seen.has(model.id)) {
+								setPulseTick((tick) => tick + 1);
+								return;
+							}
 							seen.add(model.id);
 						}
 						if (namespace === undefined) {
@@ -1681,20 +1708,6 @@ select.mcf-input{appearance:auto;height:34px}
 							const routeInvalid = route.length > 0 && !ROUTE_PATTERN.test(route);
 							const routeTaken = route.length > 0 && routes.includes(route);
 							const baseURLInvalid = baseURL.length > 0 && !isHttpUrl(baseURL);
-							const duplicate = (() => {
-								const seen = new Set<string>();
-								for (const model of filled) {
-									if (seen.has(model.id)) return model.id;
-									seen.add(model.id);
-								}
-								return null;
-							})();
-							const ready = route.length > 0 && !routeInvalid && !routeTaken
-								&& baseURL.length > 0 && !baseURLInvalid
-								&& draftProvider.apiKey.trim().length > 0
-								&& filled.length > 0 && duplicate === null
-								&& draftProvider.protocol.length > 0
-								&& !createBusy && !probeBusy;
 							/* Inline field problems: route and Base URL speak up live, the
 							 * rest only after a submit attempt, so untouched boxes stay calm. */
 							const routeError = route.length === 0
@@ -1733,6 +1746,10 @@ select.mcf-input{appearance:auto;height:34px}
 										model.id.toLowerCase().includes(query)
 										|| (typeof model.name === "string" && model.name.toLowerCase().includes(query))
 									);
+							const inputCls = (invalid: boolean): string => {
+								if (!invalid) return "mcf-input";
+								return pulse ? "mcf-input mcf-inputInvalid mcf-pulse" : "mcf-input mcf-inputInvalid";
+							};
 							return h("div", {
 								className: "mcf-overlay",
 								onClick: (event: import("react").MouseEvent<HTMLDivElement>) => {
@@ -1764,7 +1781,7 @@ select.mcf-input{appearance:auto;height:34px}
 											h("label", { className: "mcf-field" },
 												h("span", null, t("providerRoute")),
 												h("input", {
-													className: routeError === null ? "mcf-input" : "mcf-input mcf-inputInvalid",
+													className: inputCls(routeError !== null),
 													type: "text",
 													value: draftProvider.route,
 													autoFocus: true,
@@ -1802,7 +1819,7 @@ select.mcf-input{appearance:auto;height:34px}
 											h("label", { className: "mcf-field" },
 												h("span", null, t("baseURLLabel")),
 												h("input", {
-													className: baseURLLive === null ? "mcf-input" : "mcf-input mcf-inputInvalid",
+													className: inputCls(baseURLLive !== null),
 													type: "text",
 													value: draftProvider.baseURL,
 													spellCheck: false,
@@ -1818,7 +1835,7 @@ select.mcf-input{appearance:auto;height:34px}
 											h("label", { className: "mcf-field mcf-span2" },
 												h("span", null, t("apiKeyLabel"), " *"),
 												h("input", {
-													className: keyError === null ? "mcf-input" : "mcf-input mcf-inputInvalid",
+													className: inputCls(keyError !== null),
 													type: "password",
 													value: draftProvider.apiKey,
 													spellCheck: false,
@@ -1849,7 +1866,7 @@ select.mcf-input{appearance:auto;height:34px}
 											draftProvider.models.map((model, index) =>
 												h("div", { className: "mcf-modelRow", key: index },
 													h("input", {
-														className: modelRowInvalid(model.id) ? "mcf-input mcf-inputInvalid" : "mcf-input",
+														className: inputCls(modelRowInvalid(model.id)),
 														type: "text",
 														value: model.id,
 														spellCheck: false,
@@ -1986,7 +2003,7 @@ select.mcf-input{appearance:auto;height:34px}
 										h("button", {
 											type: "button",
 											className: "mcf-btn mcf-btnPrimary",
-											disabled: !ready,
+											disabled: createBusy || probeBusy,
 											onClick: () => void submitCreate()
 										}, createBusy ? t("testing") : probeBusy ? t("probing") : t("create"))
 									)
