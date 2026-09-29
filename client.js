@@ -74,7 +74,10 @@ window.__ModuleLoader__.load({
             close: "Close",
             addProvider: "Add provider",
             newProviderTitle: "New provider",
-            addProviderHint: "Once created it appears below like any other provider — every model supports testing and vision.",
+            addProviderHint: "Once created it appears below like any other provider — every model supports testing and vision. Creation checks reachability first; if the check fails you can still create, skipping it.",
+            probing: "Checking reachability…",
+            skipProbe: "Create anyway (skip the reachability check)",
+            createdFlash: "Provider {provider} created.",
             providerRoute: "Provider ID",
             providerRouteHint: "Lowercase letters, digits and dashes; starts with a letter. Becomes the key under providers.",
             providerRouteInvalid: "The ID may only use lowercase letters, digits and dashes, and must start with a letter.",
@@ -156,7 +159,10 @@ window.__ModuleLoader__.load({
             close: "关闭",
             addProvider: "新增提供商",
             newProviderTitle: "新增提供商",
-            addProviderHint: "创建后它会像其他提供商一样出现在列表里，每个模型都可测试连通、打开识图。",
+            addProviderHint: "创建后会像其他提供商一样出现在列表里，每个模型都可测试连通、打开识图。创建时会先检查接口能否连通，检查不过也可以选择跳过。",
+            probing: "正在检查连通…",
+            skipProbe: "仍然创建（跳过连通性检查）",
+            createdFlash: "已创建提供商 {provider}。",
             providerRoute: "提供商 ID",
             providerRouteHint: "小写字母、数字和中划线，字母开头；将作为 providers 下的键名。",
             providerRouteInvalid: "ID 只能使用小写字母、数字和中划线，且以字母开头。",
@@ -299,6 +305,7 @@ select.mcf-input{appearance:auto;height:34px}
 .mcf-fieldError{color:var(--mcf-danger);font-size:11px;line-height:15px}
 .mcf-inputInvalid{border-color:var(--mcf-danger-line)!important}
 .mcf-inputInvalid:focus{border-color:var(--mcf-danger)!important;box-shadow:0 0 0 3px var(--mcf-danger-soft)}
+.mcf-skipRow{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--mcf-text-2);cursor:pointer}
 .mcf-candidates{margin-top:10px;border:1px solid var(--mcf-border);border-radius:10px;background:var(--mcf-surface);overflow:hidden}
 .mcf-candHead{display:flex;gap:8px;align-items:center;padding:8px;border-bottom:1px solid var(--mcf-border);background:var(--mcf-surface-hover)}
 .mcf-candSearch{flex:1;min-width:0}
@@ -669,6 +676,18 @@ select.mcf-input{appearance:auto;height:34px}
                     const [createError, setCreateError] = React.useState(null);
                     const [createBusy, setCreateBusy] = React.useState(false);
                     const [createAttempted, setCreateAttempted] = React.useState(false);
+                    const [probePassed, setProbePassed] = React.useState(false);
+                    const [skipProbe, setSkipProbe] = React.useState(false);
+                    const [probeBusy, setProbeBusy] = React.useState(false);
+                    const [probeError, setProbeError] = React.useState(null);
+                    const [flash, setFlash] = React.useState(null);
+                    /* The creation-success note clears itself; no timer to manage by hand. */
+                    React.useEffect(() => {
+                        if (flash === null)
+                            return;
+                        const timer = window.setTimeout(() => setFlash(null), 5000);
+                        return () => window.clearTimeout(timer);
+                    }, [flash]);
                     const [fetching, setFetching] = React.useState(false);
                     const [fetchError, setFetchError] = React.useState(null);
                     const [candidates, setCandidates] = React.useState(null);
@@ -837,6 +856,9 @@ select.mcf-input{appearance:auto;height:34px}
                             return;
                         setCreateError(null);
                         setCreateAttempted(false);
+                        setProbePassed(false);
+                        setSkipProbe(false);
+                        setProbeError(null);
                         setCreating({
                             ns: target.ns,
                             route: "",
@@ -852,6 +874,9 @@ select.mcf-input{appearance:auto;height:34px}
                         setCreating(null);
                         setCreateError(null);
                         setCreateAttempted(false);
+                        setProbePassed(false);
+                        setSkipProbe(false);
+                        setProbeError(null);
                         setFetchError(null);
                         setCandidates(null);
                         setPicked(new Set());
@@ -885,8 +910,13 @@ select.mcf-input{appearance:auto;height:34px}
                             return t("protocolAnthropicMessages");
                         return identifier;
                     };
-                    /** Patch one field of the new-provider draft. */
+                    /** Patch one field of the new-provider draft; endpoint edits un-pass the probe. */
                     const patchCreate = (patch) => {
+                        if (patch.baseURL !== undefined || patch.apiKey !== undefined || patch.protocol !== undefined) {
+                            setProbePassed(false);
+                            setSkipProbe(false);
+                            setProbeError(null);
+                        }
                         setCreating((current) => (current === null ? current : { ...current, ...patch }));
                     };
                     /** Patch one model row of the new-provider draft. */
@@ -1001,6 +1031,33 @@ select.mcf-input{appearance:auto;height:34px}
                             setCreateError(t("noNamespace"));
                             return;
                         }
+                        /*
+                         * Reachability gate: an unreachable endpoint never silently becomes
+                         * a provider. The probe asks the endpoint the same question the
+                         * fetch-models helper does; once it passes (or the user chooses to
+                         * skip after a failure) the write proceeds.
+                         */
+                        if (!probePassed && !skipProbe) {
+                            setProbeBusy(true);
+                            setProbeError(null);
+                            try {
+                                const answer = await ctx.remote.llm.discoverModels(current.ns, {
+                                    baseURL,
+                                    api: current.protocol,
+                                    apiKey: current.apiKey.trim()
+                                });
+                                if (answer.ok) {
+                                    setProbePassed(true);
+                                }
+                                else {
+                                    setProbeError(describeFetchFailure(answer.error.message));
+                                    return;
+                                }
+                            }
+                            finally {
+                                setProbeBusy(false);
+                            }
+                        }
                         setCreateBusy(true);
                         try {
                             const profile = {
@@ -1036,6 +1093,7 @@ select.mcf-input{appearance:auto;height:34px}
                             setCreating(null);
                             setCreateError(null);
                             setCreateAttempted(false);
+                            setFlash(fill(t("createdFlash"), { provider: route }));
                             await load();
                         }
                         finally {
@@ -1260,7 +1318,8 @@ select.mcf-input{appearance:auto;height:34px}
                                 && baseURL.length > 0 && !baseURLInvalid
                                 && draftProvider.apiKey.trim().length > 0
                                 && filled.length > 0 && duplicate === null
-                                && draftProvider.protocol.length > 0 && !createBusy;
+                                && draftProvider.protocol.length > 0
+                                && !createBusy && !probeBusy;
                             /* Inline field problems: route and Base URL speak up live, the
                              * rest only after a submit attempt, so untouched boxes stay calm. */
                             const routeError = route.length === 0
@@ -1444,17 +1503,26 @@ select.mcf-input{appearance:auto;height:34px}
                                 }
                             }), h("span", { className: "mcf-candId" }, model.id), typeof model.name === "string" && model.name !== model.id
                                 ? h("span", { className: "mcf-candName" }, model.name)
-                                : null)))), createError === null ? null : h("p", { className: "mcf-error" }, createError)), h("div", { className: "mcf-modalFoot" }, h("button", {
+                                : null)))), probeError === null ? null : h("p", { className: "mcf-error" }, probeError), probeError === null ? null : h("label", { className: "mcf-skipRow" }, h("input", {
+                                className: "mcf-check",
+                                type: "checkbox",
+                                checked: skipProbe,
+                                onChange: (event) => {
+                                    setSkipProbe(event.target.checked);
+                                    if (event.target.checked)
+                                        setProbeError(null);
+                                }
+                            }), t("skipProbe")), createError === null ? null : h("p", { className: "mcf-error" }, createError)), h("div", { className: "mcf-modalFoot" }, h("button", {
                                 type: "button",
                                 className: "mcf-btn",
-                                disabled: createBusy,
+                                disabled: createBusy || probeBusy,
                                 onClick: closeCreate
                             }, t("cancel")), h("button", {
                                 type: "button",
                                 className: "mcf-btn mcf-btnPrimary",
                                 disabled: !ready,
                                 onClick: () => void submitCreate()
-                            }, createBusy ? t("testing") : t("create")))));
+                            }, createBusy ? t("testing") : probeBusy ? t("probing") : t("create")))));
                         }
                         const row = adding === null
                             ? undefined
@@ -1541,6 +1609,9 @@ select.mcf-input{appearance:auto;height:34px}
                             setCreating(null);
                             setCreateError(null);
                             setCreateAttempted(false);
+                            setProbePassed(false);
+                            setSkipProbe(false);
+                            setProbeError(null);
                             setFetchError(null);
                             setCandidates(null);
                             setPicked(new Set());
@@ -1569,7 +1640,7 @@ select.mcf-input{appearance:auto;height:34px}
                         "aria-busy": state.refreshing,
                         disabled: state.refreshing,
                         onClick: load
-                    }, h(RefreshIcon, { spin: state.refreshing })))), loading ? h("p", { className: "mcf-status", role: "status" }, t("loading")) : null, failed ? h("div", { className: "mcf-failure" }, h("p", null, state.error ?? t("loadFailed")), h("button", { type: "button", className: "mcf-btn mcf-btnSm", onClick: load }, t("retry"))) : null, !failed && !loading && state.rows.length === 0 ? h("p", { className: "mcf-status" }, t("empty")) : null, state.rows.length > 0 ? h("div", { className: "mcf-groups" }, state.rows.map(renderProvider)) : null, !state.writable && state.rows.length > 0 ? h("p", { className: "mcf-notice" }, t("readOnly")) : null, renderDialog());
+                    }, h(RefreshIcon, { spin: state.refreshing })))), flash === null ? null : h("p", { className: "mcf-status", role: "status" }, flash), loading ? h("p", { className: "mcf-status", role: "status" }, t("loading")) : null, failed ? h("div", { className: "mcf-failure" }, h("p", null, state.error ?? t("loadFailed")), h("button", { type: "button", className: "mcf-btn mcf-btnSm", onClick: load }, t("retry"))) : null, !failed && !loading && state.rows.length === 0 ? h("p", { className: "mcf-status" }, t("empty")) : null, state.rows.length > 0 ? h("div", { className: "mcf-groups" }, state.rows.map(renderProvider)) : null, !state.writable && state.rows.length > 0 ? h("p", { className: "mcf-notice" }, t("readOnly")) : null, renderDialog());
                 }
                 ctx.slots.inject("main", () => ctx.slots.register({
                     name: "main",
