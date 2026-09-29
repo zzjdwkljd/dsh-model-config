@@ -86,9 +86,31 @@ type SettingsPathOp =
 
 /* ------------------------------------------------------------ client contracts */
 
+/** `llm/discoverModels` request: an endpoint to ask, with optional overrides. */
+interface LlmModelDiscoveryRequest {
+	provider?: string;
+	baseURL?: string;
+	api?: string;
+	apiKey?: string;
+}
+
+/** One model a discover call found on the endpoint. */
+interface LlmDiscoveredModel {
+	id: string;
+	name?: string;
+	contextWindow?: number;
+	maxTokens?: number;
+	inputModalities?: readonly string[];
+}
+
+/** `llm/listProviders` + `llm/discoverModels`, the only llm methods this page calls. */
 interface LlmRemote {
 	listProviders(): Promise<RemoteResult<LlmProviderInfo[]>>;
 	listConfigurableProviders(): Promise<RemoteResult<LlmConfigurableProvider[]>>;
+	discoverModels(
+		settingsNs: string,
+		request: LlmModelDiscoveryRequest,
+	): Promise<RemoteResult<LlmDiscoveredModel[]>>;
 }
 
 interface SettingsRemote {
@@ -323,8 +345,16 @@ window.__ModuleLoader__.load({
 			baseURLLabel: "Base URL",
 			baseURLRequired: "A Base URL is required.",
 			baseURLInvalid: "The Base URL must be an http(s) address.",
-			apiKeyLabel: "API key (optional)",
+			apiKeyLabel: "API key",
 			apiKeyHint: "Stored under the reference {ref}, derived from the provider ID.",
+			keyRequired: "Enter the API key for this provider.",
+			fetchModels: "Fetch available models",
+			fetching: "Fetching…",
+			fetchEmpty: "The endpoint answered with no models.",
+			fetchNeedsBaseURL: "Enter the Base URL first.",
+			adoptModels: "Add selected ({count})",
+			search: "Search",
+			toggleAll: "Toggle all",
 			addModelRow: "Add a model",
 			removeRow: "Remove",
 			needOneModel: "Add at least one model.",
@@ -391,8 +421,16 @@ window.__ModuleLoader__.load({
 			baseURLLabel: "Base URL",
 			baseURLRequired: "请填写 Base URL。",
 			baseURLInvalid: "Base URL 必须是 http(s) 地址。",
-			apiKeyLabel: "API Key（可选）",
+			apiKeyLabel: "API Key",
 			apiKeyHint: "密钥将按提供商 ID 派生的引用名 {ref} 保存。",
+			keyRequired: "请填写该提供商的 API Key。",
+			fetchModels: "获取可用模型",
+			fetching: "获取中…",
+			fetchEmpty: "端点没有返回任何模型。",
+			fetchNeedsBaseURL: "请先填写 Base URL。",
+			adoptModels: "添加所选（{count}）",
+			search: "搜索",
+			toggleAll: "全选 / 反选",
 			addModelRow: "添加一个模型",
 			removeRow: "移除",
 			needOneModel: "至少填写一个模型。",
@@ -504,6 +542,16 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
 .mcf-check{width:14px;height:14px;margin:0;accent-color:var(--mcf-accent);cursor:pointer}
 .mcf-addRowWrap{margin-top:10px}
 select.mcf-input{appearance:auto;height:34px}
+.mcf-modelsHead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:16px}
+.mcf-candidates{margin-top:10px;border:1px solid var(--mcf-border);border-radius:10px;background:var(--mcf-surface);overflow:hidden}
+.mcf-candHead{display:flex;gap:8px;align-items:center;padding:8px;border-bottom:1px solid var(--mcf-border);background:var(--mcf-surface-hover)}
+.mcf-candSearch{flex:1;min-width:0}
+.mcf-candActions{display:flex;gap:8px;flex-shrink:0}
+.mcf-candList{max-height:200px;overflow:auto}
+.mcf-candRow{display:flex;gap:8px;align-items:center;padding:6px 10px;cursor:pointer;font-size:12px}
+.mcf-candRow:hover{background:var(--mcf-surface-hover)}
+.mcf-candId{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:var(--mcf-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcf-candName{color:var(--mcf-text-3);flex-shrink:0}
 @media (prefers-reduced-motion:reduce){.mcf-spin,.mcf-overlay,.mcf-modal{animation:none}.mcf-group,.mcf-group::before,.mcf-chevron svg,.mcf-panelWrap,.mcf-switch,.mcf-switchThumb,.mcf-model,.mcf-btn,.mcf-input{transition:none}}
 `;
 
@@ -910,6 +958,11 @@ select.mcf-input{appearance:auto;height:34px}
 					const [creating, setCreating] = React.useState<NewProviderDraft | null>(null);
 					const [createError, setCreateError] = React.useState<string | null>(null);
 					const [createBusy, setCreateBusy] = React.useState(false);
+					const [fetching, setFetching] = React.useState(false);
+					const [fetchError, setFetchError] = React.useState<string | null>(null);
+					const [candidates, setCandidates] = React.useState<LlmDiscoveredModel[] | null>(null);
+					const [picked, setPicked] = React.useState<ReadonlySet<string>>(new Set<string>());
+					const [candidateQuery, setCandidateQuery] = React.useState("");
 					const [, setLocaleTick] = React.useState(0);
 					const generation = React.useRef(0);
 
@@ -1085,6 +1138,10 @@ select.mcf-input{appearance:auto;height:34px}
 					const closeCreate = (): void => {
 						setCreating(null);
 						setCreateError(null);
+						setFetchError(null);
+						setCandidates(null);
+						setPicked(new Set<string>());
+						setCandidateQuery("");
 					};
 
 					/** Patch one field of the new-provider draft. */
@@ -1101,6 +1158,66 @@ select.mcf-input{appearance:auto;height:34px}
 								models: current.models.map((model, at) => (at === index ? { ...model, ...patch } : model))
 							};
 						});
+					};
+
+					/**
+					 * Ask the endpoint what models it serves, via the llm runtime's
+					 * discover remote — the same channel the Models settings page uses.
+					 * The candidates land in a picker; adopting appends only the ids the
+					 * draft does not list yet, so refetching never duplicates rows.
+					 */
+					const runFetchModels = async (): Promise<void> => {
+						const current = creating;
+						if (current === null) return;
+						const baseURL = current.baseURL.trim();
+						if (baseURL.length === 0) {
+							setFetchError(t("fetchNeedsBaseURL"));
+							return;
+						}
+						setFetching(true);
+						setFetchError(null);
+						try {
+							const apiKey = current.apiKey.trim();
+							const response = await ctx.remote.llm.discoverModels(current.ns, {
+								baseURL,
+								api: current.protocol,
+								...(apiKey.length === 0 ? {} : { apiKey })
+							});
+							if (!response.ok) {
+								setFetchError(response.error.message);
+								return;
+							}
+							const found = response.value;
+							if (found.length === 0) {
+								setFetchError(t("fetchEmpty"));
+								return;
+							}
+							const known = new Set(current.models.map((model) => model.id.trim()));
+							setCandidates(found);
+							setPicked(new Set(found.filter((model) => !known.has(model.id)).map((model) => model.id)));
+							setCandidateQuery("");
+						} finally {
+							setFetching(false);
+						}
+					};
+
+					/** Append every picked candidate the draft does not already list. */
+					const adoptPickedModels = (): void => {
+						const current = creating;
+						const found = candidates;
+						if (current === null || found === null) return;
+						const known = new Set(current.models.map((model) => model.id.trim()));
+						const additions = found
+							.filter((model) => picked.has(model.id) && !known.has(model.id))
+							.map((model) => ({
+								id: model.id,
+								name: typeof model.name === "string" ? model.name : "",
+								vision: Array.isArray(model.inputModalities) && model.inputModalities.includes("image")
+							}));
+						patchCreate({ models: [...current.models, ...additions] });
+						setCandidates(null);
+						setPicked(new Set<string>());
+						setCandidateQuery("");
 					};
 
 					/**
@@ -1133,6 +1250,10 @@ select.mcf-input{appearance:auto;height:34px}
 							setCreateError(t("baseURLInvalid"));
 							return;
 						}
+						if (current.apiKey.trim().length === 0) {
+							setCreateError(t("keyRequired"));
+							return;
+						}
 						if (models.length === 0) {
 							setCreateError(t("needOneModel"));
 							return;
@@ -1162,7 +1283,7 @@ select.mcf-input{appearance:auto;height:34px}
 								}))
 							};
 							if (current.displayName.trim().length > 0) profile.displayName = current.displayName.trim();
-							if (current.apiKey.trim().length > 0) profile.apiKeyEnv = deriveKeyRef(route);
+							profile.apiKeyEnv = deriveKeyRef(route);
 							const response = await ctx.remote.settings.mutate(
 								current.ns,
 								[{ op: "set", path: ["providers", route], value: profile }],
@@ -1174,7 +1295,7 @@ select.mcf-input{appearance:auto;height:34px}
 								return;
 							}
 							const key = current.apiKey.trim();
-							if (key.length > 0 && ctx.remote.credentials !== undefined) {
+							if (ctx.remote.credentials !== undefined) {
 								const stored = await ctx.remote.credentials.set(deriveKeyRef(route), key);
 								if (!stored.ok) {
 									/*
@@ -1481,8 +1602,17 @@ select.mcf-input{appearance:auto;height:34px}
 							})();
 							const ready = route.length > 0 && !routeInvalid && !routeTaken
 								&& baseURL.length > 0 && !baseURLInvalid
+								&& draftProvider.apiKey.trim().length > 0
 								&& filled.length > 0 && duplicate === null
 								&& draftProvider.protocol.length > 0 && !createBusy;
+							const query = candidateQuery.trim().toLowerCase();
+							const visibleCandidates = (): LlmDiscoveredModel[] =>
+								query.length === 0
+									? candidates ?? []
+									: (candidates ?? []).filter((model) =>
+										model.id.toLowerCase().includes(query)
+										|| (typeof model.name === "string" && model.name.toLowerCase().includes(query))
+									);
 							return h("div", {
 								className: "mcf-overlay",
 								onClick: (event: import("react").MouseEvent<HTMLDivElement>) => {
@@ -1560,25 +1690,33 @@ select.mcf-input{appearance:auto;height:34px}
 												})
 											),
 											h("label", { className: "mcf-field mcf-span2" },
-												h("span", null, t("apiKeyLabel")),
+												h("span", null, t("apiKeyLabel"), " *"),
 												h("input", {
 													className: "mcf-input",
 													type: "password",
 													value: draftProvider.apiKey,
 													spellCheck: false,
+													required: true,
 													placeholder: draftProvider.route.length > 0
 														? deriveKeyRef(draftProvider.route.trim())
 														: undefined,
 													onChange: (event: import("react").ChangeEvent<HTMLInputElement>) =>
 														patchCreate({ apiKey: event.target.value })
 												}),
-												draftProvider.route.trim().length === 0 || draftProvider.apiKey.trim().length === 0
-													? null
-													: h("span", { className: "mcf-fieldHint" },
-														fill(t("apiKeyHint"), { ref: deriveKeyRef(route) }))
+												h("span", { className: "mcf-fieldHint" },
+													fill(t("apiKeyHint"), { ref: route.length > 0 ? deriveKeyRef(route) : "…" }))
 											)
 										),
-										h("p", { className: "mcf-panelTitle", style: { marginTop: "16px" } }, t("models")),
+										h("div", { className: "mcf-modelsHead" },
+											h("p", { className: "mcf-panelTitle" }, t("models")),
+											h("button", {
+												type: "button",
+												className: "mcf-btn mcf-btnSm",
+												disabled: fetching || baseURLInvalid || baseURL.length === 0 || createBusy,
+												title: baseURL.length === 0 ? t("fetchNeedsBaseURL") : undefined,
+												onClick: () => void runFetchModels()
+											}, fetching ? t("fetching") : t("fetchModels"))
+										),
 										h("div", { className: "mcf-modelRows" },
 											draftProvider.models.map((model, index) =>
 												h("div", { className: "mcf-modelRow", key: index },
@@ -1633,6 +1771,66 @@ select.mcf-input{appearance:auto;height:34px}
 													models: [...draftProvider.models, { id: "", name: "", vision: true }]
 												})
 											}, t("addModelRow"))
+										),
+										fetchError === null ? null : h("p", { className: "mcf-error" }, fetchError),
+										candidates === null ? null : h("div", { className: "mcf-candidates" },
+											h("div", { className: "mcf-candHead" },
+												h("input", {
+													className: "mcf-input mcf-candSearch",
+													type: "text",
+													value: candidateQuery,
+													placeholder: t("search"),
+													onChange: (event: import("react").ChangeEvent<HTMLInputElement>) =>
+														setCandidateQuery(event.target.value)
+												}),
+												h("div", { className: "mcf-candActions" },
+													h("button", {
+														type: "button",
+														className: "mcf-btn mcf-btnSm",
+														onClick: () => {
+															const visible = visibleCandidates();
+															const all = visible.length > 0 && visible.every((model) => picked.has(model.id));
+															setPicked((current) => {
+																const next = new Set(current);
+																for (const model of visible) {
+																	if (all) next.delete(model.id);
+																	else next.add(model.id);
+																}
+																return next;
+															});
+														}
+													}, t("toggleAll")),
+													h("button", {
+														type: "button",
+														className: "mcf-btn mcf-btnSm mcf-btnPrimary",
+														disabled: picked.size === 0,
+														onClick: adoptPickedModels
+													}, fill(t("adoptModels"), { count: String(picked.size) }))
+												)
+											),
+											h("div", { className: "mcf-candList", role: "listbox", "aria-multiselectable": true },
+												visibleCandidates().map((model) =>
+													h("label", { className: "mcf-candRow", key: model.id },
+														h("input", {
+															className: "mcf-check",
+															type: "checkbox",
+															checked: picked.has(model.id),
+															onChange: () => {
+																setPicked((current) => {
+																	const next = new Set(current);
+																	if (next.has(model.id)) next.delete(model.id);
+																	else next.add(model.id);
+																	return next;
+																});
+															}
+														}),
+														h("span", { className: "mcf-candId" }, model.id),
+														typeof model.name === "string" && model.name !== model.id
+															? h("span", { className: "mcf-candName" }, model.name)
+															: null
+													)
+												)
+											)
 										),
 										createError === null ? null : h("p", { className: "mcf-error" }, createError)
 									),
@@ -1765,6 +1963,10 @@ select.mcf-input{appearance:auto;height:34px}
 							setModalTest(null);
 							setCreating(null);
 							setCreateError(null);
+							setFetchError(null);
+							setCandidates(null);
+							setPicked(new Set<string>());
+							setCandidateQuery("");
 						};
 						document.addEventListener("keydown", onKey);
 						return () => document.removeEventListener("keydown", onKey);
