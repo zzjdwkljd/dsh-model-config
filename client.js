@@ -60,6 +60,8 @@ window.__ModuleLoader__.load({
             testOk: "Connected — the model answered.",
             conflict: "These settings changed elsewhere. Refresh and try again.",
             noNamespace: "The settings section for this provider was not found.",
+            nameDeepseekAccount: "DeepSeek Official Account",
+            nameDeepseekOfficial: "DeepSeek Official API Key",
             addModelFor: "Add a model to {provider}",
             addHint: "Enter the model ID, test it if you like, then add it.",
             deleteModel: "Delete model",
@@ -107,6 +109,8 @@ window.__ModuleLoader__.load({
             testOk: "连通正常，模型已应答。",
             conflict: "设置已在别处被修改，请刷新后重试。",
             noNamespace: "找不到该提供商的设置分区。",
+            nameDeepseekAccount: "DeepSeek 官方账号",
+            nameDeepseekOfficial: "DeepSeek 官方 API Key",
             addModelFor: "添加到 {provider}",
             addHint: "填写模型 ID，可先测试连通性再添加。",
             deleteModel: "删除模型",
@@ -276,12 +280,13 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
          * order the Models settings page uses: account first, official second.
          * @param registered - live provider routes in registration order.
          * @param declared - declared configurable providers in declaration order.
+         * @param nameOf - locale-aware display-name resolver, supplied by the page.
          * @returns one row per provider, deduplicated by route id.
          */
-        function joinDirectory(registered, declared) {
+        function joinDirectory(registered, declared, nameOf) {
             const directory = declared.map((entry) => ({
                 provider: entry.provider,
-                displayName: entry.displayName,
+                displayName: nameOf(entry.provider, entry.displayName),
                 settingsNs: entry.settingsNs,
                 settingsPath: [...entry.settingsPath],
                 directoryError: typeof entry.error === "string" ? entry.error : undefined
@@ -292,7 +297,7 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
                     continue;
                 directory.push({
                     provider: provider.id,
-                    displayName: provider.name,
+                    displayName: nameOf(provider.id, provider.name),
                     settingsNs: "",
                     settingsPath: [],
                     directoryError: undefined
@@ -308,10 +313,10 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
          * @param view - the settings document answer.
          * @returns only rows that are live routes or actually configured.
          */
-        function buildRows(registered, declared, view) {
+        function buildRows(registered, declared, view, nameOf) {
             const active = new Set(registered.map((provider) => provider.id));
             const namespaces = new Map(view.namespaces.map((namespace) => [namespace.ns, namespace]));
-            const rows = joinDirectory(registered, declared).map((entry) => {
+            const rows = joinDirectory(registered, declared, nameOf).map((entry) => {
                 const namespace = entry.settingsNs === "" ? undefined : namespaces.get(entry.settingsNs);
                 const profile = namespace === undefined ? undefined : getPath(namespace.value, entry.settingsPath);
                 return {
@@ -468,6 +473,21 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
             apply(ctx) {
                 ctx.effect(() => ctx.locale.register(NS, { zh, en }), "model-config: dictionaries");
                 const t = ctx.locale.bind(NS);
+                /**
+                 * Display name for one provider: the two built-in DeepSeek routes get
+                 * locale-aware names that say which channel they are, everything else
+                 * keeps the name the adapter itself reports.
+                 * @param provider - the route id.
+                 * @param fallback - the name reported by the directory or adapter.
+                 * @returns the name to render.
+                 */
+                function displayNameOf(provider, fallback) {
+                    if (provider === "deepseek-account")
+                        return t("nameDeepseekAccount");
+                    if (provider === "deepseek-official")
+                        return t("nameDeepseekOfficial");
+                    return fallback;
+                }
                 /** The page: provider accordion, model rows, add form, probe results. */
                 function ModelConfigPage(props) {
                     const [state, setState] = React.useState({
@@ -518,7 +538,7 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
                                 refreshing: false,
                                 updatedAt: new Date().toLocaleTimeString(),
                                 writable: view.writable === true,
-                                rows: buildRows(registered.value, declared.value, view),
+                                rows: buildRows(registered.value, declared.value, view, displayNameOf),
                                 namespaces: new Map(view.namespaces.map((namespace) => [namespace.ns, namespace]))
                             });
                         }
