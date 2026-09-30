@@ -136,21 +136,22 @@ Client 产物会被拼进共享 combo 脚本，所以 **`client.js` 顶层只能
 
 ## 验证
 
-改动导入/导出逻辑时可跑这几支探针（放在工作区 `_probe/`，不属于本包）：
+改动导入/导出逻辑时可跑这几支探针（它们位于开发工作区的 `_probe/`，**不属于本包**，所以仓库里没有；
+下文的 `_probe/` 指该目录）：
 
 ```bash
-node D:/text/_probe/mcfg-export-format-test.mjs     # 导出三格式 + 导入解析/计划，含 YAML 用真实解析器回读
-node D:/text/_probe/mcfg-host-test.mjs              # 引用校验、白名单、以及带真实凭据库的路由级测试
-node D:/text/_probe/mcfg-i18n-test.mjs              # 中英字典键位、占位符与 fill() 参数、死键
-node D:/text/_probe/audit-ui.mjs                    # CSS 变量/规格与「用了没写、写了没用」的类名
-node D:/text/_probe/mcfg-client-bundle-check.mjs    # 运行中的服务是否已提供新的 client 产物
-node D:/text/_probe/mcfg-live-route-check.mjs       # 运行中的 Host 路由（需已重启进程）
+node _probe/mcfg-export-format-test.mjs     # 导出三格式 + 导入解析/计划，含 YAML 用真实解析器回读
+node _probe/mcfg-host-test.mjs              # 引用校验、白名单、以及带真实凭据库的路由级测试
+node _probe/mcfg-i18n-test.mjs              # 中英字典键位、占位符与 fill() 参数、死键
+node _probe/audit-ui.mjs                    # CSS 变量/规格与「用了没写、写了没用」的类名
+node _probe/mcfg-client-bundle-check.mjs    # 运行中的服务是否已提供新的 client 产物
+node _probe/mcfg-live-route-check.mjs       # 运行中的 Host 路由（需已重启进程）
 ```
 
-后两支默认打 `http://127.0.0.1:19387`，可用 `DSH_ORIGIN` 覆盖（例如 GUI 换端口后）：
+后两支默认打本机 GUI（`http://127.0.0.1:19387`），可用 `DSH_ORIGIN` 覆盖（例如 GUI 换端口后）：
 
 ```bash
-DSH_ORIGIN=http://127.0.0.1:43120 node D:/text/_probe/mcfg-client-bundle-check.mjs
+DSH_ORIGIN=http://127.0.0.1:43120 node _probe/mcfg-client-bundle-check.mjs
 ```
 
 `mcfg-export-format-test.mjs` 会把 `src/client.ts` 里的导出/导入辅助函数整段切出来编译执行，
