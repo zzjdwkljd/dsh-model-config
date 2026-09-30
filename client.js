@@ -127,11 +127,12 @@ window.__ModuleLoader__.load({
             exportScope: "{count} providers · {models} models",
             exportIncludeKey: "Include the API key in plain text",
             exportPick: "Providers to export",
-            exportPickCount: "{picked}/{total} selected",
-            exportPickAll: "Select all",
-            exportPickNone: "Select none",
-            exportPickModels: "{count} models",
-            exportPickEmpty: "Pick at least one provider.",
+            exportPickProvider: "Select this provider",
+            exportSearchModel: "Search models…",
+            exportPreview: "Export preview",
+            exportNoModel: "No model matches the search.",
+            exportSummary: "{picked}/{total} providers · {models} models selected",
+            exportFocusScope: "{name} · {route} · {count} models",
             exportTitlePicked: "{count} providers selected",
             exportRefsNone: "These providers declare no API key reference, so no key can be exported.",
             exportKeyLoading: "Reading the key from the credential store…",
@@ -284,11 +285,12 @@ window.__ModuleLoader__.load({
             exportScope: "{count} 个提供商 · {models} 个模型",
             exportIncludeKey: "以明文包含密钥",
             exportPick: "要导出的提供商",
-            exportPickCount: "已选 {picked}/{total}",
-            exportPickAll: "全选",
-            exportPickNone: "全不选",
-            exportPickModels: "{count} 个模型",
-            exportPickEmpty: "至少选择一个提供商。",
+            exportPickProvider: "该商全选",
+            exportSearchModel: "搜索模型…",
+            exportPreview: "导出预览",
+            exportNoModel: "没有匹配的模型。",
+            exportSummary: "已选 {picked}/{total} 个提供商 · {models} 个模型",
+            exportFocusScope: "{name} · {route} · {count} 个模型",
             exportTitlePicked: "已选 {count} 个提供商",
             exportRefsNone: "这些提供商没有声明密钥引用，无法导出密钥。",
             exportKeyLoading: "正在从凭据库读取密钥…",
@@ -470,8 +472,6 @@ select.mcf-input{appearance:auto;height:34px}
    list's own scrollbar would land outside the visible box and be unreachable.
    max-height caps it on a tall window; min-height keeps about five rows before
    the dialog body starts scrolling instead. */
-.mcf-pickBox{flex:0 1 auto;min-height:150px;max-height:min(52vh,420px);flex-direction:column;display:flex}
-.mcf-pickBox .mcf-candHead{flex:0 0 auto}
 .mcf-pickList{flex:1 1 auto;min-height:0;overflow:auto;scrollbar-gutter:stable}
 .mcf-candRow{display:flex;gap:8px;align-items:center;padding:6px 10px;cursor:pointer;font-size:12px}
 .mcf-candRow:hover{background:var(--mcf-surface-hover)}
@@ -497,11 +497,362 @@ select.mcf-input{appearance:auto;height:34px}
 .mcf-importBadgeReplace{border-color:var(--mcf-warn);color:var(--mcf-warn)}
 .mcf-importBadgeSkip{border-color:var(--mcf-border);color:var(--mcf-text-3)}
 .mcf-importReason{color:var(--mcf-text-3);font-size:11px;line-height:16px}
+/* Key-read status inside the export dialog's code pane: it must not add a grid
+   child to the modal body, whose rows the visual system places explicitly. */
+.mcf-codeNote{margin:0;padding:6px 14px 0;color:var(--mcf-warn);font-size:10px;line-height:15px}
 .mcf-importError{margin:0;color:var(--mcf-danger);font-size:11px;line-height:16px;white-space:pre-line}
 .mcf-importFile{display:none}
 .mcf-pickName{color:var(--mcf-text);font-size:12px;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mcf-copied{color:var(--mcf-success);font-size:12px;line-height:18px}
 @media (prefers-reduced-motion:reduce){.mcf-spin,.mcf-overlay,.mcf-modal,.mcf-pulse{animation:none}.mcf-group,.mcf-group::before,.mcf-chevron svg,.mcf-panelWrap,.mcf-switch,.mcf-switchThumb,.mcf-model,.mcf-btn,.mcf-input{transition:none}}
+
+/* Two-pane (master-detail) skeleton: the visual system below styles these
+   classes but deliberately does not lay them out, so the base rules live here. */
+.mcf-split{display:grid;grid-template-columns:232px minmax(0,1fr);flex:1 1 auto;min-height:260px;min-width:0;border:1px solid var(--mcf-border);border-radius:10px;overflow:hidden;background:var(--mcf-surface)}
+.mcf-splitNav{border-right:1px solid var(--mcf-border);background:var(--mcf-surface-hover);flex-direction:column;min-width:0;display:flex}
+.mcf-splitHead{flex:0 0 auto;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid var(--mcf-border);color:var(--mcf-text-3);font-size:11px;line-height:16px;display:flex;min-width:0}
+.mcf-splitTitle{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcf-splitItem{align-items:center;gap:8px;padding:7px 10px;border-left:3px solid transparent;cursor:pointer;font-size:12px;line-height:17px;display:flex}
+.mcf-splitItem:hover{background:var(--mcf-surface)}
+.mcf-splitItem[aria-selected="true"]{background:var(--mcf-accent-soft);border-left-color:var(--mcf-accent)}
+.mcf-splitIcon{flex:none;width:20px;height:20px;border-radius:6px;background:var(--mcf-accent-soft);color:var(--mcf-accent);font-size:10px;font-weight:600;align-items:center;justify-content:center;display:flex}
+.mcf-splitMain{flex-direction:column;min-width:0;display:flex}
+.mcf-splitBody{flex:1 1 auto;min-height:0;overflow:auto}
+.mcf-modelRow{align-items:center;gap:8px;padding:6px 10px;cursor:pointer;font-size:12px;line-height:17px;display:flex}
+.mcf-modelRow:hover{background:var(--mcf-surface-hover)}
+.mcf-modelMeta{color:var(--mcf-text-3);font-size:11px;flex:none}
+.mcf-splitEmpty{padding:14px 10px;color:var(--mcf-text-3);font-size:12px}
+.mcf-badge{flex:none;padding:1px 7px;border:1px solid var(--mcf-border);border-radius:999px;color:var(--mcf-text-3);font-size:10px;line-height:15px}
+.mcf-badgeOn{border-color:var(--mcf-accent);color:var(--mcf-accent)}
+/* Detail pane: stacked by default, side by side on request. */
+.mcf-detail{flex:1 1 auto;min-height:0;overflow:auto}
+.mcf-detail[data-side="true"]{display:grid;grid-template-columns:284px minmax(0,1fr);overflow:hidden}
+.mcf-detail[data-side="true"]>.mcf-detailFacts{border-right:1px solid var(--mcf-border);overflow:auto}
+.mcf-detail[data-side="true"]>.mcf-detailModels{overflow:auto}
+.mcf-facts{margin:0;padding:10px 12px;border-bottom:1px solid var(--mcf-border);background:var(--mcf-surface-hover);gap:4px 14px;grid-template-columns:auto minmax(0,1fr);font-size:12px;line-height:18px;display:grid}
+.mcf-detail[data-side="true"] .mcf-facts{border-bottom:0;background:transparent;grid-template-columns:minmax(0,1fr);gap:2px}
+.mcf-facts dt{color:var(--mcf-text-3)}
+.mcf-facts dd{margin:0;color:var(--mcf-text);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcf-detailBar{flex:0 0 auto;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid var(--mcf-border);font-size:12px;color:var(--mcf-text-2);display:flex}
+.mcf-seg{border:1px solid var(--mcf-border);border-radius:8px;padding:2px;background:var(--mcf-neutral);gap:2px;display:inline-flex}
+.mcf-seg>button{border:0;background:transparent;color:var(--mcf-text-2);font-size:11px;line-height:16px;padding:3px 9px;border-radius:6px;cursor:pointer}
+.mcf-seg>button[aria-pressed="true"]{background:var(--mcf-surface);color:var(--mcf-text);box-shadow:0 1px 2px #18181B14}
+/* Composer model selector popover. */
+.mcf-pop{width:100%;max-width:520px;background:var(--mcf-surface);border:1px solid var(--mcf-border);border-radius:14px;box-shadow:0 18px 44px #18181B26;overflow:hidden;margin-bottom:12px;flex-direction:column;display:flex}
+.mcf-popTop{align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--mcf-border);display:flex}
+.mcf-popSearch{flex:1 1 auto;min-width:0;border:0;background:transparent;color:var(--mcf-text);font-size:13px;line-height:20px;outline:none}
+.mcf-popSearch::placeholder{color:var(--mcf-text-3)}
+.mcf-popCols{grid-template-columns:192px minmax(0,1fr);height:262px;display:grid}
+.mcf-popNav{border-right:1px solid var(--mcf-border);background:var(--mcf-surface-hover);overflow:auto;padding:6px;flex-direction:column;gap:2px;display:flex}
+.mcf-popNavItem{align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:12px;line-height:17px;display:flex}
+.mcf-popNavItem:hover{background:var(--mcf-surface)}
+.mcf-popNavItem[aria-selected="true"]{background:var(--mcf-surface);box-shadow:inset 0 0 0 1px var(--mcf-border-hover)}
+.mcf-popMain{flex-direction:column;min-width:0;display:flex}
+.mcf-popHead{flex:0 0 auto;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px 4px;color:var(--mcf-text-3);font-size:11px;line-height:16px;display:flex}
+.mcf-popList{flex:1 1 auto;min-height:0;overflow:auto;padding:2px 6px 6px}
+.mcf-popRow{align-items:center;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:13px;line-height:18px;color:var(--mcf-text);display:flex}
+.mcf-popRow:hover{background:var(--mcf-surface-hover)}
+.mcf-popRow[aria-current="true"]{background:var(--mcf-accent-soft);color:var(--mcf-accent);font-weight:600}
+.mcf-popCheck{flex:none;width:14px;color:var(--mcf-accent)}
+.mcf-popTag{margin-left:auto;color:var(--mcf-text-3);font-size:11px;font-weight:400}
+.mcf-popFoot{flex:0 0 auto;align-items:center;gap:6px;padding:8px 12px;border-top:1px solid var(--mcf-border);color:var(--mcf-text-3);font-size:11px;line-height:16px;display:flex}
+.mcf-key{border:1px solid var(--mcf-border);border-radius:5px;padding:0 5px;color:var(--mcf-text-2);font-size:10px;line-height:16px}
+.mcf-popChip{margin-left:auto;border:1px solid var(--mcf-border);border-radius:999px;padding:2px 9px;color:var(--mcf-text-2);font-size:11px;cursor:pointer;background:var(--mcf-surface)}
+.mcf-popChip b{color:var(--mcf-text);font-weight:600;margin-left:4px}
+/* A stand-in for the DSH composer under the popover. */
+.mcf-composerMock{width:100%;max-width:720px;margin:0 auto;padding:0 0 36px;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;display:flex}
+.mcf-composer{width:100%;max-width:520px;border:1px solid var(--mcf-border);border-radius:14px;background:var(--mcf-surface);padding:12px}
+.mcf-composerInput{color:var(--mcf-text-3);font-size:13px;line-height:20px;padding:6px 2px 14px}
+.mcf-chipRow{align-items:center;gap:8px;display:flex}
+.mcf-chip{border:1px solid var(--mcf-border);border-radius:999px;padding:3px 10px;color:var(--mcf-text-2);font-size:11px;line-height:18px}
+.mcf-chip b{color:var(--mcf-text);font-weight:600;margin-left:4px}
+@media (max-width:460px){.mcf-split{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}.mcf-splitNav{border-right:0;border-bottom:1px solid var(--mcf-border);max-height:180px}}
+/* ===================== VISUAL SYSTEM (设计定稿 2026-09-30) ===================== */
+/* MODEL CONFIG · VISUAL SYSTEM
+   Appearance only. The original HTML controls, data and JavaScript are retained.
+   Inline this stylesheet after the existing styles in all three views. */
+body[data-ds-dark-theme]{color-scheme:dark}
+.mcf-page{
+ --mcf-accent:#735bd5;--mcf-accent-hover:#634bc4;--mcf-accent-soft:#f1edf9;--mcf-tag-bg:#f3effb;--mcf-tag-line:#e7dff5;--mcf-accent-line:#ded4f2;--mcf-ring:#b9a3eb;
+ --mcf-bg:#f5f6fa;--mcf-surface:#fff;--mcf-surface-hover:#f9f8fc;--mcf-surface-open:#faf9fd;
+ --mcf-text:#293044;--mcf-text-2:#7c8495;--mcf-text-3:#a3a9b7;--mcf-border:#e9ebf2;--mcf-border-hover:#dcd7ea;--mcf-neutral:#f4f5f8;--mcf-track-off:#dfe2ea;
+ --mcf-ghost-border:#e4e6ef;--mcf-ghost-text:#697287;--mcf-danger:#cc6575;--mcf-danger-strong:#b34a5d;--mcf-danger-soft:#fcf2f4;--mcf-danger-line:#f0cbd3;
+ --mcf-scrim:#edf0f8;--mcf-success:#428b76;--mcf-warn:#b18243;--mcf-shadow:0 16px 45px #353b5810,0 2px 7px #353b5804;--mcf-panel-shadow:0 12px 35px #353b580c;
+ --mcf-code-bg:#282b3c;--mcf-code-border:#343849;--mcf-code-text:#dce0ef;--mcf-code-muted:#929bb3;
+ font-family:var(--dsw-font-family,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif);
+ font-size:13px;line-height:1.65;letter-spacing:.01em;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;gap:24px;padding:34px 38px 32px;background:var(--mcf-bg)
+}
+body[data-ds-dark-theme] .mcf-page{
+ --mcf-bg:#141620;--mcf-surface:#1e212d;--mcf-surface-hover:#252735;--mcf-surface-open:#232533;--mcf-text:#e6e8f2;--mcf-text-2:#a2a8bc;--mcf-text-3:#717a92;--mcf-border:#2e3243;--mcf-border-hover:#474059;--mcf-neutral:#262a39;
+ --mcf-accent:#ae95f1;--mcf-accent-hover:#bda5fb;--mcf-accent-soft:#322b46;--mcf-tag-bg:#322b46;--mcf-tag-line:#493b65;--mcf-accent-line:#554478;--mcf-ring:#766098;--mcf-track-off:#414658;--mcf-ghost-border:#373c50;--mcf-ghost-text:#b6bdd0;
+ --mcf-danger:#e397a4;--mcf-danger-strong:#d18190;--mcf-danger-soft:#392936;--mcf-danger-line:#68404e;--mcf-scrim:#12141e;--mcf-success:#85bca9;--mcf-warn:#c4a16e;
+ --mcf-shadow:0 18px 50px #00000032,0 1px 4px #00000020;--mcf-panel-shadow:0 15px 38px #00000026;--mcf-code-bg:#161923;--mcf-code-border:#2c3040;--mcf-code-text:#c4ccde;--mcf-code-muted:#6e7992
+}
+.mcf-page *, .mcf-page *:before,.mcf-page *:after{box-sizing:border-box}
+.mcf-page button,.mcf-page input,.mcf-page select,.mcf-page textarea{font-family:inherit}
+.mcf-page>*{max-width:1180px}
+.mcf-page button{-webkit-tap-highlight-color:transparent}
+.mcf-page svg{flex-shrink:0}
+.mcf-page :focus-visible{outline:2px solid var(--mcf-ring);outline-offset:3px}
+.mcf-page input:focus-visible,.mcf-page textarea:focus-visible{outline:none}
+.mcf-page ::selection{background:#c9bbec66}
+.mcf-page [role="listbox"],.mcf-detail,.mcf-detailFacts,.mcf-detailModels,.mcf-modalBody,.mcf-splitBody,.mcf-popList{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--mcf-text-3) 40%,transparent) transparent}
+.mcf-page ::-webkit-scrollbar{width:5px;height:5px}
+.mcf-page ::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--mcf-text-3) 34%,transparent);border-radius:8px}
+.mcf-page ::-webkit-scrollbar-track{background:transparent}
+.mcf-pageHead{padding:0;align-items:center;gap:26px;flex-shrink:0}
+.mcf-pageIdentity,.mcf-modalIdentity{display:flex;align-items:flex-start;gap:13px;min-width:0}
+.mcf-titleIcon{width:40px;height:40px;flex-shrink:0;border:1px solid var(--mcf-tag-line);border-radius:11px;background:var(--mcf-accent-soft);color:var(--mcf-accent);display:grid;place-items:center;margin-top:3px}
+.mcf-titleIcon svg{width:21px;height:21px}
+.mcf-pageTitle{font-size:23px;line-height:1.35;font-weight:650;letter-spacing:-.55px;color:var(--mcf-text)}
+.mcf-pageIntro{max-width:470px;margin-top:8px;font-size:12px;line-height:1.85;color:var(--mcf-text-2)}
+.mcf-toolbar{gap:8px;flex-wrap:wrap;row-gap:9px}
+.mcf-updated{font-size:10px;color:var(--mcf-text-3);margin:0 3px;white-space:nowrap}
+.mcf-btn{height:36px;border-radius:8px;font-size:12px;font-weight:500;line-height:1.4;padding:0 13px;background:var(--mcf-surface);color:var(--mcf-ghost-text);border-color:var(--mcf-ghost-border);gap:6px;box-shadow:0 1px 2px #25274203;transition:background-color .15s,border-color .15s,box-shadow .15s,color .15s}
+.mcf-btn:hover:not(:disabled){border-color:var(--mcf-border-hover);background:var(--mcf-surface-hover);box-shadow:0 2px 5px #38304905}
+.mcf-btnPrimary{background:var(--mcf-accent);border-color:var(--mcf-accent);color:#fff;box-shadow:0 3px 7px #735bd518;font-weight:550}
+.mcf-btnPrimary:hover:not(:disabled){background:var(--mcf-accent-hover);border-color:var(--mcf-accent-hover);box-shadow:0 4px 11px #735bd526}
+body[data-ds-dark-theme] .mcf-btnPrimary{color:#211a34}
+.mcf-btnSm{height:33px;font-size:11px;padding:0 11px}
+.mcf-iconBtn{width:36px;padding:0;display:inline-grid;place-items:center}
+.mcf-btnSm.mcf-iconBtn{width:33px}
+.mcf-btnDanger{color:white;background:var(--mcf-danger);border-color:var(--mcf-danger)}
+.mcf-btnDanger:hover:not(:disabled){background:var(--mcf-danger-strong);border-color:var(--mcf-danger-strong)}
+.mcf-iconDanger{color:#9c8597}
+.mcf-iconDanger:hover:not(:disabled){color:var(--mcf-danger);border-color:var(--mcf-danger-line);background:var(--mcf-danger-soft);box-shadow:none}
+.mcf-themeMoon,.mcf-themeSun{width:15px;height:15px;color:var(--mcf-text-2)}
+.mcf-themeSun{display:none}
+body[data-ds-dark-theme] .mcf-themeMoon{display:none}
+body[data-ds-dark-theme] .mcf-themeSun{display:block}
+.mcf-seg{height:36px;padding:3px;border-radius:8px;background:var(--mcf-neutral);border-color:var(--mcf-border);gap:2px;align-items:center}
+.mcf-seg>button{height:28px;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 9px;border-radius:5px;font-family:inherit;font-size:10px;color:var(--mcf-text-3)}
+.mcf-seg>button svg{width:12px;height:12px}
+.mcf-seg>button[aria-pressed="true"]{color:var(--mcf-text);background:var(--mcf-surface);box-shadow:0 1px 4px #3e344010}
+.mcf-input{height:36px;border-radius:7px;border-color:var(--mcf-ghost-border);background:var(--mcf-surface);font-size:12px;line-height:1.5;color:var(--mcf-text)}
+.mcf-input:focus{border-color:var(--mcf-ring);box-shadow:0 0 0 3px color-mix(in srgb,var(--mcf-accent) 9%,transparent)}
+select.mcf-input{height:36px;font-size:12px}
+.mcf-check{width:15px;height:15px;flex-shrink:0;accent-color:var(--mcf-accent);margin:0}
+.mcf-rowCheck{font-size:12px;color:var(--mcf-text-2);gap:8px;line-height:20px}
+.mcf-split{border-color:var(--mcf-border);border-radius:16px;background:var(--mcf-surface);box-shadow:var(--mcf-panel-shadow);grid-template-columns:250px minmax(0,1fr);overflow:hidden;min-height:320px}
+.mcf-splitNav{background:color-mix(in srgb,var(--mcf-surface) 65%,var(--mcf-bg));border-right-color:var(--mcf-border);min-height:0;padding-bottom:10px}
+.mcf-splitHead{padding:17px 18px 13px;min-height:50px;color:var(--mcf-text-3);font-size:11px;line-height:1.6;font-weight:500;letter-spacing:.025em;border-bottom-color:var(--mcf-border)}
+.mcf-splitNav .mcf-splitHead{border-bottom-color:transparent;padding-bottom:10px;min-height:48px}
+.mcf-splitHead #navCount{font-size:10px;letter-spacing:0;background:var(--mcf-neutral);border:1px solid var(--mcf-border);border-radius:5px;padding:1px 6px;font-variant-numeric:tabular-nums;color:var(--mcf-text-3)}
+.mcf-pickList{min-height:0;scrollbar-gutter:auto;overflow:auto}
+.mcf-splitItem{border:1px solid transparent;border-radius:9px;margin:3px 10px;min-height:46px;padding:9px;gap:9px;font-size:12px;line-height:1.5;transition:background .15s,border-color .15s;position:relative}
+.mcf-splitItem:hover{background:var(--mcf-neutral)}
+.mcf-splitItem[aria-selected="true"]{background:var(--mcf-accent-soft);border:1px solid var(--mcf-tag-line);box-shadow:0 1px 4px #49366804}
+.mcf-splitIcon{width:29px;height:29px;border-radius:8px;border:1px solid var(--mcf-border);background:var(--mcf-surface);color:var(--mcf-text-2);font-size:10px;font-weight:600;letter-spacing:-.2px}
+.mcf-splitItem[aria-selected="true"] .mcf-splitIcon{border-color:var(--mcf-accent);background:var(--mcf-accent);color:white;box-shadow:0 2px 5px #735bd514}
+body[data-ds-dark-theme] .mcf-splitItem[aria-selected="true"] .mcf-splitIcon{color:#241b3b}
+.mcf-pickName{font-size:12px;font-weight:500;line-height:1.5;color:var(--mcf-text-2)}
+.mcf-splitItem[aria-selected="true"] .mcf-pickName{color:var(--mcf-accent);font-weight:550}
+.mcf-splitItem>.mcf-modelMeta{display:grid;place-items:center;background:color-mix(in srgb,var(--mcf-text-3) 9%,transparent);min-width:19px;height:19px;padding:0 4px;border-radius:5px;font-size:9px;color:var(--mcf-text-3)}
+.mcf-splitItem[aria-selected="true"]>.mcf-modelMeta{background:color-mix(in srgb,var(--mcf-accent) 10%,transparent);color:var(--mcf-accent)}
+.mcf-splitMain{min-height:0}
+.mcf-splitTitle{font-size:13px;line-height:1.6;color:var(--mcf-text);font-weight:600;letter-spacing:-.1px}
+.mcf-modelMeta{font-size:11px;color:var(--mcf-text-3)}
+.mcf-splitEmpty{padding:24px 18px;font-size:12px;color:var(--mcf-text-3)}
+.mcf-switch{width:36px;height:20px;vertical-align:middle;background:var(--mcf-track-off);box-shadow:inset 0 0 0 1px #37394c05}
+.mcf-switchThumb{width:16px;height:16px;top:2px;left:2px;box-shadow:0 1px 3px #26324b21}
+.mcf-switch[aria-checked="true"]{background:var(--mcf-accent)}
+.mcf-switch[aria-checked="true"] .mcf-switchThumb{transform:translateX(16px)}
+/* 02 · model settings */
+.mcf-page[data-view="main"]{gap:23px}
+.mcf-page[data-view="main"]>.mcf-split{max-width:1180px!important;flex:1;min-height:390px}
+.mcf-page[data-view="main"] .mcf-splitMain>.mcf-splitHead{padding:18px 23px;min-height:66px;background:var(--mcf-surface);gap:14px}
+.mcf-page[data-view="main"] .mcf-splitMain>.mcf-splitHead>.mcf-splitTitle{font-size:14px;font-weight:600;white-space:normal;overflow:visible}
+.mcf-page[data-view="main"] .mcf-splitMain>.mcf-splitHead .mcf-iconDanger{font-size:11px;color:var(--mcf-danger);background:transparent;border-color:var(--mcf-danger-line);box-shadow:none}
+.mcf-detail{min-height:0;background:var(--mcf-surface)}
+.mcf-detailFacts{padding:20px 23px 0}
+.mcf-detailFacts:before{content:"接口信息";display:block;color:var(--mcf-text-2);font-size:11px;font-weight:550;letter-spacing:.02em;margin-bottom:13px}
+.mcf-facts{grid-template-columns:75px minmax(0,1fr);gap:10px 14px;border:1px solid var(--mcf-border);border-radius:10px;background:color-mix(in srgb,var(--mcf-surface) 58%,var(--mcf-bg));padding:16px;font-size:12px;line-height:1.65;align-items:center}
+.mcf-facts dt{font-size:11px;color:var(--mcf-text-3)}
+.mcf-facts dd{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;font-size:11px;color:var(--mcf-text-2);letter-spacing:0;min-width:0;white-space:normal;word-break:break-word;overflow:visible;line-height:1.75}
+.mcf-facts dd:nth-of-type(4){font-family:inherit;justify-self:start;color:var(--mcf-success);font-size:10px;border:1px solid color-mix(in srgb,var(--mcf-success) 13%,transparent);background:color-mix(in srgb,var(--mcf-success) 5%,transparent);border-radius:5px;padding:2px 7px;line-height:1.6}
+.mcf-facts dd:nth-of-type(5){justify-self:start;border:1px solid var(--mcf-tag-line);background:var(--mcf-tag-bg);color:var(--mcf-accent);font-size:10px;line-height:1.6;padding:2px 7px;border-radius:5px;font-weight:500}
+.mcf-detailModels{padding:19px 23px 24px}
+.mcf-detailBar{border-bottom:0;padding:0 0 14px;gap:12px;min-height:42px;font-size:11px;color:var(--mcf-text-3)}
+.mcf-page[data-view="main"] .mcf-modelRow{display:grid;grid-template-columns:minmax(0,1fr) auto 26px 36px 29px;gap:11px;min-height:58px;padding:12px;border:1px solid var(--mcf-border);border-radius:9px;margin-bottom:8px;background:var(--mcf-surface);transition:background .15s,border-color .15s}
+.mcf-page[data-view="main"] .mcf-modelRow:hover{background:var(--mcf-surface-hover);border-color:var(--mcf-border-hover)}
+.mcf-candId{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;font-size:12px;font-weight:500;line-height:1.75;letter-spacing:-.2px;white-space:normal;word-break:break-word;color:var(--mcf-text)}
+.mcf-page[data-view="main"] .mcf-modelRow>.mcf-modelMeta:nth-child(2){font-size:10px;padding:2px 6px;line-height:1.5;border-radius:4px;color:var(--mcf-text-3);background:var(--mcf-neutral);white-space:nowrap}
+.mcf-page[data-view="main"] .mcf-modelRow>.mcf-modelMeta:nth-child(3){font-size:9px;margin-left:0!important;color:var(--mcf-text-3)}
+.mcf-page[data-view="main"] .mcf-modelRow>.mcf-iconBtn{width:27px;height:27px;border-radius:6px;background:transparent;border-color:transparent;box-shadow:none;color:var(--mcf-text-3)}
+.mcf-page[data-view="main"] .mcf-modelRow>.mcf-iconBtn:hover{color:var(--mcf-danger);border-color:var(--mcf-danger-line);background:var(--mcf-danger-soft)}
+.mcf-detail[data-side="true"]{grid-template-columns:270px minmax(0,1fr);overflow:hidden}
+.mcf-detail[data-side="true"]>.mcf-detailFacts{padding:20px 17px;border-right-color:var(--mcf-border);background:color-mix(in srgb,var(--mcf-surface) 75%,var(--mcf-bg))}
+.mcf-detail[data-side="true"]>.mcf-detailModels{padding:20px 20px 24px}
+.mcf-detail[data-side="true"] .mcf-facts{padding:0;border:0;background:transparent;border-radius:0;grid-template-columns:minmax(0,1fr);gap:4px}
+.mcf-detail[data-side="true"] .mcf-facts dt{font-size:10px;margin-top:12px}
+.mcf-detail[data-side="true"] .mcf-facts dt:first-child{margin-top:0}
+.mcf-detail[data-side="true"] .mcf-facts dd{font-size:11px}
+.mcf-detail[data-side="true"] .mcf-modelRow{grid-template-columns:minmax(0,1fr) auto 36px 27px;gap:8px}
+.mcf-detail[data-side="true"] .mcf-modelRow>.mcf-modelMeta:nth-child(3){grid-row:2;grid-column:2;justify-self:end}
+.mcf-detail[data-side="true"] .mcf-modelRow>.mcf-switch{grid-row:1/3;grid-column:3}
+.mcf-detail[data-side="true"] .mcf-modelRow>.mcf-iconBtn{grid-row:1/3;grid-column:4}
+.mcf-detail[data-side="true"] .mcf-modelRow>.mcf-candId{grid-row:1/3;grid-column:1}
+.mcf-detail[data-side="true"] .mcf-modelRow>.mcf-modelMeta:nth-child(2){grid-row:1;grid-column:2}
+/* 01 · export. Reflow the existing JSON textarea; add no new control. */
+.mcf-page[data-view="export"]{padding:0}
+.mcf-page[data-view="export"]>.mcf-overlay{background:var(--mcf-scrim);padding:28px;animation:none}
+.mcf-page[data-view="export"] .mcf-modalWide{max-width:1030px;width:100%;height:min(754px,calc(100dvh - 56px));border-radius:18px;border-color:var(--mcf-border);box-shadow:var(--mcf-shadow);background:var(--mcf-surface);overflow:hidden}
+.mcf-modalHead{padding:25px 26px 22px;align-items:flex-start;border-bottom:1px solid var(--mcf-border);gap:20px;background:var(--mcf-surface);flex-shrink:0}
+.mcf-modalIdentity{gap:12px}
+.mcf-modalIdentity .mcf-titleIcon{width:36px;height:36px;border-radius:10px;margin-top:2px}
+.mcf-modalIdentity .mcf-titleIcon svg{width:19px;height:19px}
+.mcf-modalTitle{font-size:20px;line-height:1.5;letter-spacing:-.35px;font-weight:650}
+.mcf-modalSub{font-size:11px;line-height:1.85;margin-top:7px;max-width:720px;color:var(--mcf-text-3)}
+.mcf-page[data-view="export"] .mcf-modalBody{display:grid;grid-template-columns:minmax(0,1.72fr) minmax(270px,1fr);grid-template-rows:auto minmax(260px,1fr) auto;gap:17px 20px;min-height:0;padding:21px 26px 20px;overflow:auto}
+.mcf-exportOpts{grid-column:1/-1;grid-row:1;display:flex;align-items:center;gap:18px;margin:0;padding-bottom:2px;min-width:0}
+.mcf-exportOpts>.mcf-field{display:flex;flex-direction:row;align-items:center;gap:10px}
+.mcf-exportOpts .mcf-field>span{font-size:11px;color:var(--mcf-text-3);white-space:nowrap}
+.mcf-exportSelect{width:235px}
+.mcf-exportOpts>.mcf-rowCheck{margin-left:auto;font-size:11px;gap:7px;padding:7px 10px;background:var(--mcf-neutral);border:1px solid var(--mcf-border);border-radius:7px}
+.mcf-page[data-view="export"] .mcf-modalBody>.mcf-split{grid-column:1;grid-row:2;grid-template-columns:205px minmax(0,1fr);box-shadow:none;min-height:260px;border-radius:10px;min-width:0}
+.mcf-page[data-view="export"] .mcf-splitHead{padding:13px 13px 10px;min-height:43px;font-size:10px}
+.mcf-page[data-view="export"] .mcf-splitNav{padding-bottom:7px}
+.mcf-page[data-view="export"] .mcf-splitItem{padding:8px 7px;gap:7px;margin:3px 6px;min-height:45px;border-radius:7px}
+.mcf-page[data-view="export"] .mcf-splitItem .mcf-splitIcon{width:25px;height:25px;border-radius:6px;font-size:9px}
+.mcf-page[data-view="export"] .mcf-splitItem .mcf-check{width:13px;height:13px}
+.mcf-page[data-view="export"] .mcf-pickName{font-size:11px;white-space:normal;line-height:1.5;overflow:visible;text-overflow:clip}
+.mcf-page[data-view="export"] .mcf-splitItem>.mcf-modelMeta{font-size:8px;min-width:15px;height:17px;padding:0 3px}
+.mcf-page[data-view="export"] .mcf-splitMain>.mcf-splitHead{display:flex;flex-direction:column;align-items:stretch;gap:12px;flex-shrink:0;padding:14px 14px 12px}
+.mcf-page[data-view="export"] #mainHead{font-size:11px;line-height:1.75;font-weight:550;white-space:normal;overflow:visible}
+.mcf-page[data-view="export"] .mcf-splitMain>.mcf-splitHead>span:last-child{width:100%;gap:6px!important;display:flex;align-items:center}
+.mcf-page[data-view="export"] #q{flex:1;min-width:0;width:100%!important;height:31px!important;font-size:11px!important;border-radius:6px;padding:0 9px;background:var(--mcf-neutral)}
+.mcf-page[data-view="export"] #provAll{height:31px;padding:0 8px;font-size:10px;flex-shrink:0;border-radius:6px;box-shadow:none}
+.mcf-page[data-view="export"] .mcf-modelRow{display:grid;grid-template-columns:15px minmax(0,1fr) auto;gap:8px;border:1px solid transparent;margin:5px 7px;padding:10px 9px;min-height:43px;border-radius:7px;transition:background .15s,border-color .15s}
+.mcf-page[data-view="export"] .mcf-modelRow:hover{background:var(--mcf-surface-hover)}
+.mcf-page[data-view="export"] .mcf-modelRow:has(input:checked){background:var(--mcf-accent-soft);border-color:var(--mcf-tag-line)}
+.mcf-page[data-view="export"] .mcf-modelRow:has(input:checked)>.mcf-candId{color:var(--mcf-accent)}
+.mcf-page[data-view="export"] .mcf-modelRow>.mcf-candId{font-size:11px;line-height:1.6;letter-spacing:-.25px}
+.mcf-page[data-view="export"] .mcf-modelRow>.mcf-modelMeta{font-size:9px;padding:2px 5px;line-height:1.5;border-radius:4px;background:color-mix(in srgb,var(--mcf-text-3) 7%,transparent);color:var(--mcf-text-3);margin-left:0!important;white-space:nowrap}
+.mcf-codePane{grid-column:2;grid-row:2;display:flex;flex-direction:column;min-width:0;min-height:0;border:1px solid var(--mcf-code-border);border-radius:10px;overflow:hidden;background:var(--mcf-code-bg)}
+.mcf-codeHead{padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--mcf-code-text);border-bottom:1px solid var(--mcf-code-border);font-size:11px;flex-shrink:0}
+.mcf-codeKind{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:9px;color:var(--mcf-code-muted);letter-spacing:.06em;padding:2px 5px;border:1px solid var(--mcf-code-border);border-radius:4px}
+.mcf-page[data-view="export"] .mcf-codePane .mcf-exportText{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;flex:1;min-height:110px;width:100%;max-height:none;background:var(--mcf-code-bg);color:var(--mcf-code-text);border:0;border-radius:0;box-shadow:none;line-height:1.9;font-size:10px;letter-spacing:0;padding:14px;resize:vertical;scrollbar-color:#62697e55 transparent}
+.mcf-page[data-view="export"] .mcf-codePane .mcf-exportText:focus{outline:none;box-shadow:inset 0 0 0 1px #9585ca55}
+.mcf-exportWarn{grid-column:1/-1;grid-row:3;display:flex;align-items:center;gap:7px;padding:9px 11px;margin:0;color:var(--mcf-warn);border:1px solid color-mix(in srgb,var(--mcf-warn) 18%,transparent);background:color-mix(in srgb,var(--mcf-warn) 5%,var(--mcf-surface));border-radius:7px;font-size:10px;line-height:1.7}
+.mcf-exportWarn svg{width:13px;height:13px;flex-shrink:0}
+.mcf-modalFoot{padding:17px 26px;border-top-color:var(--mcf-border);gap:8px;background:color-mix(in srgb,var(--mcf-surface) 80%,var(--mcf-bg));flex-shrink:0}
+.mcf-modalFoot #sum{font-size:11px;line-height:1.7;color:var(--mcf-text-2)}
+.mcf-modalFoot .mcf-btn{height:35px;font-size:11px;padding:0 13px}
+/* 04 · composer model selector. No extra button, no new input. */
+.mcf-page[data-view="composer"]{padding:26px 28px 34px}
+.mcf-composerMock{max-width:700px;width:100%;height:100%;min-height:0;margin:0 auto;justify-content:flex-end;padding:0;flex-shrink:0}
+.mcf-pop{max-width:624px;min-height:0;margin-bottom:15px;border-radius:17px;background:var(--mcf-surface);border-color:var(--mcf-border);box-shadow:var(--mcf-shadow)}
+.mcf-popTop{padding:15px 16px;border-bottom-color:var(--mcf-border);gap:10px;min-height:57px}
+.mcf-popTop>svg{width:15px;height:15px;color:var(--mcf-text-3)!important}
+.mcf-popSearch{font-family:inherit;font-size:12px;line-height:1.75;color:var(--mcf-text);padding:0;outline:0}
+.mcf-popTop:focus-within{box-shadow:inset 0 -1px 0 var(--mcf-tag-line)}
+.mcf-popTop #theme{width:30px;height:30px;border-radius:6px;background:var(--mcf-neutral);border-color:transparent;box-shadow:none}
+.mcf-popCols{grid-template-columns:227px minmax(0,1fr);height:340px;min-height:0}
+.mcf-popNav{background:color-mix(in srgb,var(--mcf-surface) 65%,var(--mcf-bg));padding:9px 7px;gap:4px;border-right-color:var(--mcf-border)}
+.mcf-popNavItem{min-height:42px;border:1px solid transparent;border-radius:8px;padding:8px 9px;gap:8px;transition:background .15s,border-color .15s;font-size:11px}
+.mcf-popNavItem:hover{background:var(--mcf-neutral)}
+.mcf-popNavItem[aria-selected="true"]{background:var(--mcf-accent-soft);box-shadow:none;border-color:var(--mcf-tag-line)}
+.mcf-popNavItem[aria-selected="true"] .mcf-pickName{color:var(--mcf-accent);font-weight:550}
+.mcf-popNavItem .mcf-splitIcon{width:26px;height:26px;border-radius:7px;font-size:9px}
+.mcf-popNavItem[aria-selected="true"] .mcf-splitIcon{background:var(--mcf-accent);border-color:var(--mcf-accent);color:white}
+body[data-ds-dark-theme] .mcf-popNavItem[aria-selected="true"] .mcf-splitIcon{color:#221932}
+.mcf-popNavItem .mcf-pickName{font-size:11px;line-height:1.5;white-space:normal;overflow:visible;text-overflow:clip}
+.mcf-popNavItem>.mcf-modelMeta{font-size:10px;color:var(--mcf-accent)}
+.mcf-popNavItem>.mcf-modelMeta:empty{display:none}
+.mcf-popMain{min-height:0;background:var(--mcf-surface)}
+.mcf-popHead{padding:18px 17px 12px;min-height:43px;font-size:10px;color:var(--mcf-text-3);gap:10px;align-items:center}
+.mcf-popHead .mcf-splitTitle{font-size:12px;font-weight:600;white-space:normal;line-height:1.6}
+.mcf-popHead #mainCount{font-size:9px;white-space:nowrap;color:var(--mcf-text-3)}
+.mcf-popList{padding:0 9px 9px}
+.mcf-popRow{display:grid;grid-template-columns:14px minmax(0,1fr) auto;gap:9px;border:1px solid transparent;border-radius:8px;min-height:47px;margin:4px 0;padding:11px 10px;transition:background .15s,border-color .15s;font-size:12px;line-height:1.6;font-weight:450}
+.mcf-popRow:hover{background:var(--mcf-surface-hover)}
+.mcf-popRow[aria-current="true"]{background:var(--mcf-accent-soft);border-color:var(--mcf-tag-line);font-weight:550;color:var(--mcf-accent)}
+.mcf-popRow>span:not(.mcf-popCheck):not(.mcf-popTag){min-width:0;white-space:normal;word-break:break-word;overflow-wrap:anywhere;line-height:1.75}
+.mcf-popCheck{width:13px;height:13px;color:var(--mcf-accent)}
+.mcf-popTag{font-size:9px;line-height:1.6;padding:2px 5px;border-radius:4px;background:var(--mcf-neutral);color:var(--mcf-text-3);margin-left:0;white-space:nowrap}
+.mcf-popRow[aria-current="true"] .mcf-popTag{background:color-mix(in srgb,var(--mcf-accent) 9%,transparent);color:var(--mcf-accent)}
+.mcf-popFoot{padding:12px 16px;border-top-color:var(--mcf-border);gap:6px;background:color-mix(in srgb,var(--mcf-surface) 90%,var(--mcf-bg));font-size:10px;color:var(--mcf-text-3);line-height:1.5;min-height:46px}
+.mcf-key{border-color:var(--mcf-border);color:var(--mcf-text-3);background:var(--mcf-surface);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:9px;border-radius:4px;line-height:16px;padding:0 4px;box-shadow:0 1px 1px #39304404}
+.mcf-popChip{display:inline-flex;align-items:center;gap:7px;border-color:var(--mcf-tag-line);border-radius:6px;background:var(--mcf-accent-soft);color:var(--mcf-accent);font-size:10px;padding:5px 9px;margin-left:auto;white-space:nowrap}
+.mcf-popChip b{color:var(--mcf-accent);font-weight:600;margin:0;font-size:10px}
+.mcf-popChip:hover{border-color:var(--mcf-ring);background:var(--mcf-tag-bg)}
+.mcf-composer{max-width:624px;padding:17px 19px 14px;min-width:0;min-height:135px;border-radius:17px;border-color:var(--mcf-border);background:var(--mcf-surface);box-shadow:var(--mcf-panel-shadow)}
+.mcf-composerInput{font-size:13px;line-height:1.8;color:var(--mcf-text-3);padding:2px 0 30px;min-height:66px}
+.mcf-chipRow{gap:7px;flex-wrap:wrap}
+.mcf-chip{display:inline-flex;align-items:center;gap:6px;border-color:var(--mcf-border);border-radius:6px;background:var(--mcf-surface-hover);padding:4px 8px;color:var(--mcf-text-3);font-size:10px;line-height:1.6;max-width:100%;min-width:0}
+.mcf-chip b{font-size:10px;line-height:1.6;color:var(--mcf-text-2);font-weight:500;margin:0;min-width:0;overflow-wrap:anywhere;word-break:break-word}
+.mcf-chipRow>.mcf-btnPrimary{height:31px;font-size:10px;padding:0 13px;border-radius:7px}
+/* Responsive rules keep every existing control reachable. */
+@media(max-width:1100px){
+ .mcf-page[data-view="main"]{padding:28px 28px 26px}.mcf-pageHead{align-items:flex-start;flex-direction:column;gap:17px}.mcf-toolbar{justify-content:flex-start}.mcf-pageIntro{max-width:720px}.mcf-split{grid-template-columns:225px minmax(0,1fr)}
+ .mcf-detail[data-side="true"]{grid-template-columns:230px minmax(0,1fr)}.mcf-detail[data-side="true"] .mcf-modelRow{grid-template-columns:minmax(0,1fr) 36px 27px;gap:7px}.mcf-detail[data-side="true"] .mcf-modelRow>.mcf-candId{grid-row:1;grid-column:1}.mcf-detail[data-side="true"] .mcf-modelRow>.mcf-modelMeta:nth-child(2){grid-row:2;grid-column:1;justify-self:start}.mcf-detail[data-side="true"] .mcf-modelRow>.mcf-modelMeta:nth-child(3){grid-row:2;grid-column:2;justify-self:center}.mcf-detail[data-side="true"] .mcf-modelRow>.mcf-switch{grid-row:1;grid-column:2}.mcf-detail[data-side="true"] .mcf-modelRow>.mcf-iconBtn{grid-row:1/3;grid-column:3}
+ .mcf-page[data-view="export"] .mcf-modalWide{max-width:960px}.mcf-page[data-view="export"] .mcf-modalBody{grid-template-columns:minmax(0,1.6fr) minmax(240px,1fr);padding-left:22px;padding-right:22px;gap:16px}.mcf-page[data-view="export"] .mcf-modalBody>.mcf-split{grid-template-columns:188px minmax(0,1fr)}
+}
+@media(max-width:840px){
+ .mcf-page[data-view="main"]{padding:22px 20px;gap:19px}.mcf-pageTitle{font-size:22px}.mcf-pageIntro{font-size:11px}.mcf-pageIdentity{gap:11px}.mcf-split{grid-template-columns:197px minmax(0,1fr)}.mcf-splitItem{gap:7px;margin-left:7px;margin-right:7px;padding:8px;min-height:45px}.mcf-pickName{font-size:11px;white-space:normal}.mcf-splitIcon{width:25px;height:25px;font-size:9px}.mcf-page[data-view="main"] .mcf-splitMain>.mcf-splitHead{padding:15px 16px;flex-wrap:wrap;gap:10px}.mcf-page[data-view="main"] .mcf-splitMain>.mcf-splitHead>.mcf-splitTitle{font-size:12px}.mcf-detailFacts{padding:17px 16px 0}.mcf-detailModels{padding:17px 16px 20px}.mcf-page[data-view="main"] .mcf-modelRow{grid-template-columns:minmax(0,1fr) 36px 27px;gap:6px 8px;min-height:65px;padding:10px}.mcf-page[data-view="main"] .mcf-modelRow>.mcf-candId{grid-column:1;grid-row:1}.mcf-page[data-view="main"] .mcf-modelRow>.mcf-modelMeta:nth-child(2){grid-column:1;grid-row:2;justify-self:start}.mcf-page[data-view="main"] .mcf-modelRow>.mcf-modelMeta:nth-child(3){grid-column:2;grid-row:2;justify-self:center}.mcf-page[data-view="main"] .mcf-modelRow>.mcf-switch{grid-column:2;grid-row:1}.mcf-page[data-view="main"] .mcf-modelRow>.mcf-iconBtn{grid-column:3;grid-row:1/3}.mcf-candId{font-size:11px}.mcf-facts{padding:13px;grid-template-columns:61px minmax(0,1fr);gap:9px 10px}.mcf-facts dt{font-size:10px}.mcf-facts dd{font-size:10px}.mcf-detail[data-side="true"]{grid-template-columns:195px minmax(225px,1fr);overflow:auto}.mcf-detail[data-side="true"]>.mcf-detailFacts,.mcf-detail[data-side="true"]>.mcf-detailModels{overflow:auto}
+ .mcf-page[data-view="export"]>.mcf-overlay{padding:20px}.mcf-page[data-view="export"] .mcf-modalWide{height:calc(100dvh - 40px);max-height:850px}.mcf-modalTitle{font-size:19px}.mcf-modalHead{padding:21px 21px 18px}.mcf-modalSub{font-size:10px}.mcf-page[data-view="export"] .mcf-modalBody{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(270px,1fr) auto minmax(170px,.65fr);overflow:auto;padding:18px 21px}.mcf-page[data-view="export"] .mcf-modalBody>.mcf-split{grid-row:2;grid-column:1;grid-template-columns:205px minmax(0,1fr);min-height:270px}.mcf-codePane{grid-row:4;grid-column:1;min-height:175px}.mcf-exportWarn{grid-row:3;grid-column:1}.mcf-modalFoot{padding:15px 21px}.mcf-exportOpts>.mcf-rowCheck{padding:7px 9px}.mcf-exportSelect{width:210px}.mcf-modalFoot #sum{font-size:10px}
+}
+@media(max-width:580px){
+ .mcf-page[data-view="main"]{padding:19px 14px;gap:17px;overflow:auto}.mcf-pageIdentity{gap:10px}.mcf-titleIcon{width:34px;height:34px;border-radius:9px;margin-top:1px}.mcf-titleIcon svg{width:19px;height:19px}.mcf-pageTitle{font-size:20px}.mcf-pageIntro{font-size:10px;line-height:1.9;margin-top:6px}.mcf-toolbar{gap:6px}.mcf-updated{font-size:9px}.mcf-btnSm{height:31px;font-size:10px;padding:0 9px}.mcf-btnSm.mcf-iconBtn{width:31px}.mcf-seg{height:33px;padding:3px}.mcf-seg>button{height:25px;font-size:9px;padding:0 7px;gap:4px}.mcf-seg>button svg{width:10px;height:10px}.mcf-page[data-view="main"]>.mcf-split{grid-template-columns:minmax(0,1fr);grid-template-rows:166px minmax(0,1fr);min-height:545px;border-radius:12px}.mcf-page[data-view="main"] .mcf-splitNav{border-right:0;border-bottom:1px solid var(--mcf-border);max-height:none;padding-bottom:6px}.mcf-page[data-view="main"] .mcf-splitNav .mcf-splitHead{padding:10px 14px 6px;min-height:34px}.mcf-page[data-view="main"] .mcf-splitItem{min-height:38px;padding:6px 9px;margin-top:2px;margin-bottom:2px}.mcf-page[data-view="main"] .mcf-pickName{white-space:nowrap;font-size:11px}.mcf-page[data-view="main"] .mcf-splitMain>.mcf-splitHead{padding:12px 14px;min-height:55px}.mcf-detailFacts{padding:14px 14px 0}.mcf-detailModels{padding:15px 14px 19px}.mcf-facts{gap:8px 10px;padding:12px}.mcf-detailFacts:before{margin-bottom:9px;font-size:10px}.mcf-detailBar{font-size:10px;padding-bottom:11px}.mcf-detail[data-side="true"]{grid-template-columns:170px minmax(210px,1fr)}.mcf-detail[data-side="true"]>.mcf-detailFacts{padding:15px 12px}.mcf-detail[data-side="true"]>.mcf-detailModels{padding:15px 12px}
+ .mcf-page[data-view="export"]>.mcf-overlay{padding:12px}.mcf-page[data-view="export"] .mcf-modalWide{height:calc(100dvh - 24px);max-height:none;border-radius:14px}.mcf-modalHead{padding:18px 16px 16px;gap:11px}.mcf-modalIdentity{gap:9px}.mcf-modalIdentity .mcf-titleIcon{width:30px;height:30px;border-radius:8px}.mcf-modalIdentity .mcf-titleIcon svg{width:16px;height:16px}.mcf-modalTitle{font-size:16px}.mcf-modalSub{font-size:9px;margin-top:6px}.mcf-modalHead #theme{width:30px;height:30px;border-radius:6px}.mcf-page[data-view="export"] .mcf-modalBody{padding:15px 16px;gap:13px;grid-template-rows:auto minmax(280px,1fr) auto 190px}.mcf-page[data-view="export"] .mcf-modalBody>.mcf-split{grid-template-columns:165px minmax(0,1fr);grid-template-rows:none;min-height:280px}.mcf-page[data-view="export"] .mcf-splitNav{max-height:none;border-right:1px solid var(--mcf-border);border-bottom:0}.mcf-page[data-view="export"] .mcf-splitItem{margin-left:4px;margin-right:4px;padding:7px 5px;gap:5px}.mcf-page[data-view="export"] .mcf-splitItem .mcf-splitIcon{width:20px;height:20px;border-radius:5px;font-size:8px}.mcf-page[data-view="export"] .mcf-pickName{font-size:9px}.mcf-page[data-view="export"] .mcf-splitItem .mcf-check{width:12px;height:12px}.mcf-page[data-view="export"] .mcf-splitItem>.mcf-modelMeta{font-size:7px;min-width:12px;height:15px;padding:0 2px}.mcf-page[data-view="export"] .mcf-splitMain>.mcf-splitHead{padding:11px 10px 10px;gap:8px}.mcf-page[data-view="export"] #mainHead{font-size:10px}.mcf-page[data-view="export"] #q{height:29px!important;font-size:10px!important;padding:0 6px}.mcf-page[data-view="export"] #provAll{font-size:9px;padding:0 6px;height:29px}.mcf-page[data-view="export"] .mcf-modelRow{margin:4px 4px;padding:8px 6px;grid-template-columns:13px minmax(0,1fr);gap:3px 6px}.mcf-page[data-view="export"] .mcf-modelRow>.mcf-check{grid-row:1/3;grid-column:1;width:13px;height:13px}.mcf-page[data-view="export"] .mcf-modelRow>.mcf-candId{grid-column:2;grid-row:1;font-size:10px}.mcf-page[data-view="export"] .mcf-modelRow>.mcf-modelMeta{grid-column:2;grid-row:2;font-size:8px;justify-self:start}.mcf-exportOpts{flex-wrap:wrap;gap:10px}.mcf-exportOpts>.mcf-field{flex:1}.mcf-exportSelect{width:100%;min-width:120px}.mcf-exportOpts>.mcf-rowCheck{margin-left:0;font-size:10px;padding:7px 9px}.mcf-exportOpts .mcf-field>span{font-size:10px}.mcf-modalFoot{padding:12px 16px;flex-wrap:wrap;gap:6px}.mcf-modalFoot #sum{flex:1 0 100%;font-size:10px;margin:0 0 4px!important}.mcf-modalFoot .mcf-btn{height:31px;font-size:10px;padding:0 11px}.mcf-codeHead{padding:11px 12px}.mcf-codePane{min-height:180px}.mcf-page[data-view="export"] .mcf-codePane .mcf-exportText{padding:12px;font-size:9px}.mcf-exportWarn{font-size:9px;padding:8px 10px}
+ .mcf-page[data-view="composer"]{padding:18px 14px 22px}.mcf-pop{border-radius:14px;margin-bottom:12px}.mcf-popTop{padding:12px 13px;gap:8px;min-height:50px}.mcf-popSearch{font-size:11px}.mcf-popCols{grid-template-columns:174px minmax(0,1fr);height:322px}.mcf-popNav{padding:7px 5px;gap:3px}.mcf-popNavItem{gap:6px;padding:7px 7px;min-height:39px;border-radius:7px}.mcf-popNavItem .mcf-splitIcon{width:22px;height:22px;font-size:8px;border-radius:6px}.mcf-popNavItem .mcf-pickName{font-size:10px}.mcf-popNavItem>.mcf-modelMeta{font-size:9px}.mcf-popHead{padding:14px 12px 9px;flex-wrap:wrap;row-gap:4px}.mcf-popHead .mcf-splitTitle{font-size:11px}.mcf-popHead #mainCount{font-size:8px}.mcf-popList{padding:0 6px 7px}.mcf-popRow{grid-template-columns:12px minmax(0,1fr);gap:5px 6px;padding:9px 7px;min-height:53px;font-size:10px}.mcf-popRow .mcf-popCheck{grid-column:1;grid-row:1/3;width:12px;height:12px}.mcf-popRow>span:not(.mcf-popCheck):not(.mcf-popTag){grid-column:2;grid-row:1}.mcf-popRow .mcf-popTag{grid-column:2;grid-row:2;justify-self:start;font-size:8px}.mcf-popFoot{padding:10px 12px;font-size:9px;gap:4px;flex-wrap:wrap;row-gap:7px}.mcf-key{font-size:8px}.mcf-popChip{font-size:9px;padding:4px 7px;gap:5px}.mcf-popChip b{font-size:9px}.mcf-composer{min-height:126px;border-radius:14px;padding:14px 15px 12px}.mcf-composerInput{font-size:12px;padding-bottom:23px;min-height:59px}.mcf-chip{font-size:9px;padding:4px 7px;gap:5px}.mcf-chip b{font-size:9px}.mcf-chipRow>.mcf-btnPrimary{font-size:9px;height:29px}
+}
+@media(max-width:390px){
+ .mcf-page[data-view="export"] .mcf-modalBody>.mcf-split{grid-template-columns:minmax(0,1fr);grid-template-rows:143px minmax(185px,1fr);min-height:333px}.mcf-page[data-view="export"] .mcf-splitNav{border-right:0;border-bottom:1px solid var(--mcf-border);padding-bottom:5px}.mcf-page[data-view="export"] .mcf-splitNav .mcf-splitHead{min-height:33px;padding-top:9px;padding-bottom:4px}.mcf-page[data-view="export"] .mcf-splitItem{min-height:34px;margin:1px 6px;padding:5px 7px}.mcf-page[data-view="export"] .mcf-pickName{font-size:10px;white-space:nowrap}.mcf-page[data-view="export"] .mcf-modalBody{grid-template-rows:auto 333px auto 190px}.mcf-page[data-view="export"] .mcf-modelRow{grid-template-columns:13px minmax(0,1fr) auto;min-height:38px;padding:8px}.mcf-page[data-view="export"] .mcf-modelRow>.mcf-check{grid-row:1;grid-column:1}.mcf-page[data-view="export"] .mcf-modelRow>.mcf-candId{grid-row:1;grid-column:2}.mcf-page[data-view="export"] .mcf-modelRow>.mcf-modelMeta{grid-row:1;grid-column:3;font-size:8px}.mcf-exportWarn{align-items:flex-start}.mcf-exportWarn svg{margin-top:2px}.mcf-modalTitle{font-size:15px}
+ .mcf-popCols{grid-template-columns:151px minmax(0,1fr);height:305px}.mcf-popNavItem{padding:7px 5px;gap:5px}.mcf-popNavItem .mcf-pickName{font-size:9px}.mcf-popNavItem .mcf-splitIcon{width:20px;height:20px;font-size:7px}.mcf-popHead .mcf-splitTitle{font-size:10px}.mcf-popRow{font-size:9px;padding:8px 6px}.mcf-popFoot>.mcf-popChip{margin-left:auto}.mcf-popFoot{font-size:8px}.mcf-page[data-view="composer"]{padding-left:11px;padding-right:11px}.mcf-chipRow>.mcf-chip:first-child{max-width:100%}
+}
+@media(max-height:650px){
+ .mcf-page[data-view="composer"]{padding-top:14px;padding-bottom:15px;overflow:auto}.mcf-composerMock{height:auto;min-height:100%;justify-content:flex-end}.mcf-popCols{height:255px}.mcf-composer{min-height:115px}.mcf-composerInput{min-height:48px;padding-bottom:18px}
+ .mcf-page[data-view="export"] .mcf-modalWide{max-height:calc(100dvh - 30px)}.mcf-page[data-view="export"] .mcf-modalHead{padding-top:16px;padding-bottom:14px}.mcf-page[data-view="export"] .mcf-modalBody{grid-template-rows:auto minmax(200px,1fr) auto}.mcf-page[data-view="export"] .mcf-modalBody>.mcf-split{min-height:200px}.mcf-page[data-view="export"] .mcf-modalFoot{padding-top:12px;padding-bottom:12px}
+}
+@media(max-width:840px) and (max-height:650px){.mcf-page[data-view="export"] .mcf-modalBody{grid-template-rows:auto 300px auto 170px}.mcf-page[data-view="export"] .mcf-modalBody>.mcf-split{min-height:300px}}
+@media(prefers-reduced-motion:reduce){.mcf-page *, .mcf-page *:before,.mcf-page *:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+/* The supplied composer renderer emits .mcf-splitItem (not .mcf-popNavItem).
+   Style that existing DOM without changing or patching its JavaScript. */
+.mcf-popNav .mcf-splitItem{margin:0;min-height:42px;padding:8px 9px;gap:8px;border-radius:8px;font-size:11px}
+.mcf-popNav .mcf-splitItem .mcf-splitIcon{width:26px;height:26px;border-radius:7px;font-size:9px}
+.mcf-popNav .mcf-splitItem .mcf-pickName{font-size:11px;line-height:1.5;white-space:normal;overflow:visible;text-overflow:clip;font-weight:450}
+.mcf-popNav .mcf-splitItem[aria-selected="true"] .mcf-pickName{font-weight:550}
+.mcf-popNav .mcf-splitItem>.mcf-modelMeta{font-size:9px;min-width:17px;height:17px;padding:0 3px;color:var(--mcf-accent);background:color-mix(in srgb,var(--mcf-accent) 9%,transparent)}
+.mcf-popNav .mcf-splitItem>.mcf-modelMeta:empty{display:none}
+.mcf-page[data-view="export"] .mcf-codePane .mcf-exportText{font-size:12px;line-height:1.85}
+@media(min-width:841px){
+ .mcf-page[data-view="main"] .mcf-pickName{font-size:13px}
+ .mcf-page[data-view="main"] .mcf-facts dd{font-size:12px}
+ .mcf-page[data-view="main"] .mcf-facts dt{font-size:11px}
+ .mcf-page[data-view="main"] .mcf-facts dd:nth-of-type(4),.mcf-page[data-view="main"] .mcf-facts dd:nth-of-type(5){font-size:11px}
+ .mcf-page[data-view="main"] .mcf-candId{font-size:13px}
+ .mcf-page[data-view="main"] .mcf-splitMain>.mcf-splitHead>.mcf-splitTitle{font-size:15px}
+}
+@media(min-width:581px) and (max-width:840px){.mcf-page[data-view="main"] .mcf-facts dd{font-size:11px}}
+@media(max-width:580px){
+ .mcf-popNav .mcf-splitItem{gap:6px;padding:7px;min-height:39px;border-radius:7px}
+ .mcf-popNav .mcf-splitItem .mcf-splitIcon{width:22px;height:22px;font-size:8px;border-radius:6px}
+ .mcf-popNav .mcf-splitItem .mcf-pickName{font-size:10px}
+ .mcf-popNav .mcf-splitItem>.mcf-modelMeta{font-size:8px;min-width:14px;height:15px}
+ .mcf-page[data-view="export"] .mcf-codePane .mcf-exportText{font-size:10px}
+}
+@media(max-width:390px){
+ .mcf-popNav .mcf-splitItem{padding:7px 5px;gap:5px}
+ .mcf-popNav .mcf-splitItem .mcf-splitIcon{width:20px;height:20px;font-size:7px}
+ .mcf-popNav .mcf-splitItem .mcf-pickName{font-size:9px}
+}
+/* Final text/spacing polish, still presentation only. */
+.mcf-page[data-view="export"] .mcf-pickName,.mcf-popNav .mcf-pickName{text-wrap:balance}
+@media(min-width:1101px){.mcf-page[data-view="export"] .mcf-modalBody>.mcf-split{grid-template-columns:218px minmax(0,1fr)}}
+@media(max-width:580px){
+ .mcf-page[data-view="main"] .mcf-pageHead{position:relative}
+ .mcf-page[data-view="main"] .mcf-pageIdentity{padding-right:39px}
+ .mcf-page[data-view="main"] .mcf-toolbar #theme{position:absolute;right:0;top:1px;width:31px;height:31px}
+ .mcf-popNav .mcf-splitItem .mcf-pickName{font-size:11px}
+ .mcf-popHead .mcf-splitTitle{font-size:11px}
+ .mcf-popRow{font-size:11px}
+ .mcf-popRow .mcf-popTag{font-size:9px}
+}
+
+.mcf-page[data-view="export"] .mcf-pickName,.mcf-popNav .mcf-pickName{word-break:keep-all;overflow-wrap:anywhere}
+/* 主色回到插件原色（用户指定：不要 visual-system 的紫） */
+.mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574FE8;--mcf-accent-soft:#EEEDFF;--mcf-tag-bg:#F0F0FF;--mcf-tag-line:#E5E3FF;--mcf-accent-line:#DCD9FF;--mcf-ring:#C7C2FF}
+body[data-ds-dark-theme] .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574FE8;--mcf-accent-soft:#26243F;--mcf-tag-bg:#26243F;--mcf-tag-line:#3A3563;--mcf-accent-line:#4B45A8;--mcf-ring:#4B45A8}
 `;
         /** Render a translate result with `{name}` placeholders filled in. */
         function fill(text, params) {
@@ -785,6 +1136,28 @@ select.mcf-input{appearance:auto;height:34px}
                 strokeWidth: 1.5, strokeLinecap: "round", "aria-hidden": "true"
             }, h("path", { d: "M4.5 4.5l7 7" }), h("path", { d: "M11.5 4.5l-7 7" }));
         }
+        /** Download/export glyph: the dialog title tile and the save button. */
+        function ExportIcon(props) {
+            const size = typeof props.size === "number" ? props.size : 15;
+            return h("svg", {
+                viewBox: "0 0 24 24", width: size, height: size, fill: "none", stroke: "currentColor",
+                strokeWidth: 1.65, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true"
+            }, h("path", { d: "M12 3v12m-4-4 4 4 4-4M4 14v6h16v-6" }));
+        }
+        /** Copy glyph for the export dialog's copy button. */
+        function CopyIcon() {
+            return h("svg", {
+                viewBox: "0 0 24 24", width: 15, height: 15, fill: "none", stroke: "currentColor",
+                strokeWidth: 1.65, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true"
+            }, h("rect", { x: 8, y: 8, width: 12, height: 12, rx: 2 }), h("path", { d: "M16 8V4H4v12h4" }));
+        }
+        /** Plaintext-key warning glyph for the export dialog's notice bar. */
+        function WarnIcon() {
+            return h("svg", {
+                viewBox: "0 0 24 24", width: 13, height: 13, fill: "none", stroke: "currentColor",
+                strokeWidth: 1.65, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true"
+            }, h("path", { d: "m12 3 10 18H2L12 3Z" }), h("path", { d: "M12 9v5M12 17h.1" }));
+        }
         /** Refresh glyph for the page toolbar; spins while a load is in flight. */
         function RefreshIcon(props) {
             return h("svg", {
@@ -827,6 +1200,26 @@ select.mcf-input{appearance:auto;height:34px}
             catch (error) {
                 return { ok: false, message: messageOf(error) };
             }
+        }
+        /** Selection key for one model inside the export dialog. */
+        function exportModelKey(provider, modelId) {
+            return `${provider}\u0000${modelId}`;
+        }
+        /**
+         * A copy of one row carrying only the ticked models, so an export can ship a
+         * subset of a provider's models without touching what the configuration holds.
+         * Undefined when no model of that provider is ticked.
+         */
+        function subsetRow(row, picked) {
+            const models = row.models.filter((model) => picked.has(exportModelKey(row.provider, model.id)));
+            if (models.length === 0)
+                return undefined;
+            const stored = getPath(row.profile, ["models"]);
+            const ids = new Set(models.map((model) => model.id));
+            const profile = isRecord(row.profile) && Array.isArray(stored)
+                ? { ...row.profile, models: stored.filter((item) => isRecord(item) && typeof item.id === "string" && ids.has(item.id)) }
+                : row.profile;
+            return { ...row, models, profile };
         }
         /* ------------------------------------------------------------ export helpers */
         /** Deep-copy one JSON value without asserting a parsed shape. */
@@ -1713,6 +2106,8 @@ select.mcf-input{appearance:auto;height:34px}
                     const [pulse, setPulse] = React.useState(false);
                     const [exporting, setExporting] = React.useState(null);
                     const [exportPicked, setExportPicked] = React.useState(new Set());
+                    const [exportFocus, setExportFocus] = React.useState(null);
+                    const [exportQuery, setExportQuery] = React.useState("");
                     const [exportFormat, setExportFormat] = React.useState("json");
                     const [includeKey, setIncludeKey] = React.useState(true);
                     const [exportCopy, setExportCopy] = React.useState("idle");
@@ -1963,7 +2358,8 @@ select.mcf-input{appearance:auto;height:34px}
                     /**
                      * Open the export dialog. The whole list is the pool (so the selection
                      * can be widened), while `picked` seeds what is ticked: one provider
-                     * from a card's own button, everything from the toolbar.
+                     * from a card's own button, everything from the toolbar. Selection is
+                     * per model, so a provider can be exported partially.
                      */
                     const startExport = (rows, picked) => {
                         if (rows.length === 0)
@@ -1972,7 +2368,9 @@ select.mcf-input{appearance:auto;height:34px}
                         const chosen = rows.filter((row) => wanted.has(row.provider));
                         const selected = chosen.length > 0 ? chosen : [...rows];
                         setExporting({ rows: [...rows], at: new Date().toISOString() });
-                        setExportPicked(new Set(selected.map((row) => row.provider)));
+                        setExportPicked(new Set(selected.flatMap((row) => row.models.map((model) => exportModelKey(row.provider, model.id)))));
+                        setExportFocus(selected[0]?.provider ?? rows[0]?.provider ?? null);
+                        setExportQuery("");
                         setExportFormat("json");
                         setIncludeKey(true);
                         setExportCopy("idle");
@@ -1984,6 +2382,8 @@ select.mcf-input{appearance:auto;height:34px}
                         exportSecretSeq.current += 1;
                         setExporting(null);
                         setExportPicked(new Set());
+                        setExportFocus(null);
+                        setExportQuery("");
                         setExportCopy("idle");
                         setSecrets({ status: "idle", values: {}, missing: [], refused: [], error: null });
                     };
@@ -2734,7 +3134,16 @@ select.mcf-input{appearance:auto;height:34px}
                         if (exporting !== null) {
                             const target = exporting;
                             const rows = target.rows;
-                            const pickedRows = rows.filter((row) => exportPicked.has(row.provider));
+                            const needle = exportQuery.trim().toLowerCase();
+                            const navRows = needle.length === 0
+                                ? rows
+                                : rows.filter((row) => providerNameOf(row).toLowerCase().includes(needle)
+                                    || row.provider.toLowerCase().includes(needle)
+                                    || row.models.some((model) => model.id.toLowerCase().includes(needle)));
+                            const pickedRows = rows
+                                .map((row) => subsetRow(row, exportPicked))
+                                .filter((row) => row !== undefined);
+                            const focus = rows.find((row) => row.provider === exportFocus) ?? navRows[0] ?? rows[0];
                             const single = pickedRows.length === 1 ? pickedRows[0] : undefined;
                             const title = single !== undefined
                                 ? fill(t("exportTitleOne"), { provider: providerNameOf(single) })
@@ -2744,34 +3153,40 @@ select.mcf-input{appearance:auto;height:34px}
                             const modelTotal = pickedRows.reduce((total, row) => total + row.models.length, 0);
                             const refs = keyRefsOf(pickedRows);
                             const text = renderExport(exportFormat, pickedRows, secrets.values, includeKey, target.at);
-                            /** Tick a provider on or off and refresh the keys the selection declares. */
+                            const keyIncluded = includeKey && secrets.status === "ready" && Object.keys(secrets.values).length > 0;
+                            const kind = exportFormat === "yaml" ? "YAML" : exportFormat === "env" ? "ENV" : "JSON";
+                            /** How many of one provider's models are ticked. */
+                            const pickedOf = (row) => row.models.reduce((total, model) => total + (exportPicked.has(exportModelKey(row.provider, model.id)) ? 1 : 0), 0);
+                            /** Tick models on or off, then refresh the keys the selection declares. */
                             const applyPick = (next) => {
                                 setExportPicked(next);
                                 setExportCopy("idle");
-                                const chosen = rows.filter((row) => next.has(row.provider));
+                                const chosen = rows.filter((row) => row.models.some((model) => next.has(exportModelKey(row.provider, model.id))));
                                 if (includeKey)
                                     void loadExportSecrets(chosen);
                             };
                             const notes = [];
-                            if (pickedRows.length > 0 && refs.length === 0) {
-                                notes.push(h("p", { className: "mcf-exportNote", key: "none" }, t("exportRefsNone")));
-                            }
-                            if (includeKey && secrets.status === "loading") {
-                                notes.push(h("p", { className: "mcf-exportNote", key: "loading" }, t("exportKeyLoading")));
-                            }
-                            if (includeKey && secrets.error !== null) {
-                                notes.push(h("p", { className: "mcf-exportWarn", key: "error" }, secrets.error));
-                            }
+                            if (includeKey && secrets.status === "loading")
+                                notes.push(t("exportKeyLoading"));
+                            if (includeKey && secrets.error !== null)
+                                notes.push(secrets.error);
                             if (includeKey && secrets.missing.length > 0) {
-                                notes.push(h("p", { className: "mcf-exportNote", key: "missing" }, fill(t("exportKeyMissing"), { refs: secrets.missing.join(", ") })));
+                                notes.push(fill(t("exportKeyMissing"), { refs: secrets.missing.join(", ") }));
                             }
                             if (includeKey && secrets.refused.length > 0) {
-                                notes.push(h("p", { className: "mcf-exportNote", key: "refused" }, fill(t("exportKeyRefused"), { refs: secrets.refused.join(", ") })));
+                                notes.push(fill(t("exportKeyRefused"), { refs: secrets.refused.join(", ") }));
                             }
-                            if (!includeKey) {
-                                notes.push(h("p", { className: "mcf-exportNote", key: "off" }, t("exportKeyOff")));
-                            }
-                            const keyIncluded = includeKey && secrets.status === "ready" && Object.keys(secrets.values).length > 0;
+                            if (pickedRows.length > 0 && refs.length === 0)
+                                notes.push(t("exportRefsNone"));
+                            /* Paired here so the row callbacks below never re-read a possibly
+                               undefined focus. */
+                            const focusModels = focus === undefined
+                                ? []
+                                : focus.models
+                                    .filter((model) => needle.length === 0
+                                    || model.id.toLowerCase().includes(needle)
+                                    || providerNameOf(focus).toLowerCase().includes(needle))
+                                    .map((model) => ({ provider: focus.provider, model }));
                             return h("div", {
                                 className: "mcf-overlay",
                                 onClick: (event) => {
@@ -2783,7 +3198,7 @@ select.mcf-input{appearance:auto;height:34px}
                                 role: "dialog",
                                 "aria-modal": "true",
                                 "aria-labelledby": "mcf-export-title"
-                            }, h("div", { className: "mcf-modalHead" }, h("div", null, h("h2", { className: "mcf-modalTitle", id: "mcf-export-title" }, title), h("p", { className: "mcf-modalSub" }, `${fill(t("exportScope"), { count: String(pickedRows.length), models: String(modelTotal) })} · ${t("exportSub")}`)), h("button", {
+                            }, h("div", { className: "mcf-modalHead" }, h("div", { className: "mcf-modalIdentity" }, h("span", { className: "mcf-titleIcon", "aria-hidden": "true" }, h(ExportIcon, { size: 15 })), h("div", null, h("h2", { className: "mcf-modalTitle", id: "mcf-export-title" }, title), h("p", { className: "mcf-modalSub" }, `${fill(t("exportScope"), { count: String(pickedRows.length), models: String(modelTotal) })} · ${t("exportSub")}`))), h("button", {
                                 type: "button",
                                 className: "mcf-btn mcf-btnSm mcf-iconBtn",
                                 "aria-label": t("close"),
@@ -2812,34 +3227,85 @@ select.mcf-input{appearance:auto;height:34px}
                                         void loadExportSecrets(pickedRows);
                                     }
                                 }
-                            }), t("exportIncludeKey"))), h("div", {
-                                className: "mcf-candidates mcf-pickBox",
-                                role: "group",
-                                "aria-label": t("exportPick")
-                            }, h("div", { className: "mcf-candHead" }, h("span", { className: "mcf-candName" }, fill(t("exportPickCount"), { picked: String(pickedRows.length), total: String(rows.length) })), h("div", { className: "mcf-candActions" }, h("button", {
-                                type: "button",
-                                className: "mcf-btn mcf-btnSm",
-                                onClick: () => applyPick(new Set(rows.map((row) => row.provider)))
-                            }, t("exportPickAll")), h("button", {
-                                type: "button",
-                                className: "mcf-btn mcf-btnSm",
-                                disabled: pickedRows.length === 0,
-                                onClick: () => applyPick(new Set())
-                            }, t("exportPickNone")))), h("div", { className: "mcf-pickList" }, rows.map((row) => h("label", { className: "mcf-candRow", key: row.provider }, h("input", {
-                                className: "mcf-check",
-                                type: "checkbox",
-                                checked: exportPicked.has(row.provider),
+                            }), t("exportIncludeKey"))), h("div", { className: "mcf-split" }, h("div", { className: "mcf-splitNav" }, h("div", { className: "mcf-splitHead" }, h("span", null, t("exportPick")), h("span", { id: "navCount" }, `${String(navRows.length)}/${String(rows.length)}`)), h("div", { className: "mcf-pickList", role: "listbox", "aria-label": t("exportPick") }, navRows.map((row) => {
+                                const on = pickedOf(row);
+                                return h("label", {
+                                    className: "mcf-splitItem",
+                                    key: row.provider,
+                                    "aria-selected": focus !== undefined && focus.provider === row.provider
+                                }, h("input", {
+                                    className: "mcf-check",
+                                    type: "checkbox",
+                                    checked: on === row.models.length && on > 0,
+                                    ref: (node) => {
+                                        if (node !== null)
+                                            node.indeterminate = on > 0 && on < row.models.length;
+                                    },
+                                    onChange: (event) => {
+                                        const next = new Set(exportPicked);
+                                        for (const model of row.models) {
+                                            const id = exportModelKey(row.provider, model.id);
+                                            if (event.target.checked)
+                                                next.add(id);
+                                            else
+                                                next.delete(id);
+                                        }
+                                        setExportFocus(row.provider);
+                                        applyPick(next);
+                                    }
+                                }), h("span", { className: "mcf-splitIcon", "aria-hidden": "true" }, monogramOf(row)), h("span", { className: "mcf-pickName" }, providerNameOf(row)), h("span", { className: "mcf-modelMeta" }, String(row.models.length)));
+                            }))), h("div", { className: "mcf-splitMain" }, h("div", { className: "mcf-splitHead" }, h("span", { className: "mcf-splitTitle", id: "mainHead" }, focus === undefined
+                                ? t("exportPick")
+                                : fill(t("exportFocusScope"), {
+                                    name: providerNameOf(focus),
+                                    route: focus.provider,
+                                    count: String(focus.models.length)
+                                })), h("span", null, h("input", {
+                                className: "mcf-input",
+                                id: "q",
+                                value: exportQuery,
+                                placeholder: t("exportSearchModel"),
+                                "aria-label": t("exportSearchModel"),
                                 onChange: (event) => {
+                                    setExportQuery(event.target.value);
+                                }
+                            }), h("button", {
+                                type: "button",
+                                className: "mcf-btn mcf-btnSm",
+                                id: "provAll",
+                                disabled: focus === undefined,
+                                onClick: () => {
+                                    if (focus === undefined)
+                                        return;
                                     const next = new Set(exportPicked);
-                                    if (event.target.checked)
-                                        next.add(row.provider);
-                                    else
-                                        next.delete(row.provider);
+                                    const all = pickedOf(focus) < focus.models.length;
+                                    for (const model of focus.models) {
+                                        const id = exportModelKey(focus.provider, model.id);
+                                        if (all)
+                                            next.add(id);
+                                        else
+                                            next.delete(id);
+                                    }
                                     applyPick(next);
                                 }
-                            }), h("span", { className: "mcf-pickName" }, providerNameOf(row)), h("span", { className: "mcf-candId" }, row.provider), h("span", { className: "mcf-candName" }, fill(t("exportPickModels"), { count: String(row.models.length) })))))), pickedRows.length === 0
-                                ? h("p", { className: "mcf-exportWarn" }, t("exportPickEmpty"))
-                                : null, ...notes, keyIncluded ? h("p", { className: "mcf-exportWarn" }, t("exportWarning")) : null, h("textarea", {
+                            }, t("exportPickProvider")))), h("div", { className: "mcf-splitBody" }, focusModels.length === 0
+                                ? h("p", { className: "mcf-splitEmpty" }, t("exportNoModel"))
+                                : focusModels.map(({ provider, model }) => h("label", { className: "mcf-modelRow", key: model.id }, h("input", {
+                                    className: "mcf-check",
+                                    type: "checkbox",
+                                    checked: exportPicked.has(exportModelKey(provider, model.id)),
+                                    onChange: (event) => {
+                                        const next = new Set(exportPicked);
+                                        const id = exportModelKey(provider, model.id);
+                                        if (event.target.checked)
+                                            next.add(id);
+                                        else
+                                            next.delete(id);
+                                        applyPick(next);
+                                    }
+                                }), h("span", { className: "mcf-candId" }, model.id), typeof model.name === "string" && model.name.length > 0 && model.name !== model.id
+                                    ? h("span", { className: "mcf-modelMeta" }, model.name)
+                                    : null))))), h("p", { className: "mcf-exportWarn" }, h(WarnIcon, {}), h("span", null, keyIncluded ? t("exportWarning") : t("exportKeyOff"))), h("section", { className: "mcf-codePane", "aria-label": t("exportPreview") }, h("header", { className: "mcf-codeHead" }, h("span", null, t("exportPreview")), h("span", { className: "mcf-codeKind" }, kind)), notes.length === 0 ? null : h("p", { className: "mcf-codeNote" }, notes.join(" · ")), h("textarea", {
                                 className: "mcf-exportText",
                                 ref: exportTextRef,
                                 readOnly: true,
@@ -2851,27 +3317,29 @@ select.mcf-input{appearance:auto;height:34px}
                                     /* Selecting everything scrolls to the tail; show the head instead. */
                                     event.currentTarget.scrollTop = 0;
                                 }
-                            })), h("div", { className: "mcf-modalFoot" }, exportCopy === "ok"
-                                ? h("span", { className: "mcf-copied", role: "status" }, t("exportCopied"))
-                                : exportCopy === "fail"
-                                    ? h("span", { className: "mcf-exportWarn", role: "status" }, t("exportCopyFailed"))
-                                    : null, h("button", {
+                            }))), h("div", { className: "mcf-modalFoot" }, h("span", { className: "mcf-importReason", id: "sum" }, `${exportCopy === "ok"
+                                ? `${t("exportCopied")} · `
+                                : exportCopy === "fail" ? `${t("exportCopyFailed")} · ` : ""}${fill(t("exportSummary"), {
+                                picked: String(pickedRows.length),
+                                total: String(rows.length),
+                                models: String(modelTotal)
+                            })}`), h("button", {
+                                type: "button",
+                                className: "mcf-btn",
+                                onClick: closeExport
+                            }, t("close")), h("button", {
                                 type: "button",
                                 className: "mcf-btn",
                                 disabled: pickedRows.length === 0,
                                 onClick: () => void copyExport(text)
-                            }, t("exportCopy")), h("button", {
+                            }, h(CopyIcon, {}), h("span", null, t("exportCopy"))), h("button", {
                                 type: "button",
                                 className: "mcf-btn mcf-btnPrimary",
                                 disabled: pickedRows.length === 0,
                                 onClick: () => {
                                     downloadText(exportFilename(pickedRows, exportFormat, target.at, rows.length), text, exportMime(exportFormat));
                                 }
-                            }, t("exportSave")), h("button", {
-                                type: "button",
-                                className: "mcf-btn",
-                                onClick: closeExport
-                            }, t("close")))));
+                            }, h(ExportIcon, { size: 15 }), h("span", null, t("exportSave"))))));
                         }
                         if (confirming !== null) {
                             const target = confirming;
@@ -3236,7 +3704,12 @@ select.mcf-input{appearance:auto;height:34px}
                     const renderSlot = props.renderSlot;
                     /* A provider can only be hand-declared where a `providers` map exists. */
                     const creatableView = state.writable && [...state.namespaces.values()].some((namespace) => isRecord(getPath(namespace.value, ["providers"])) || isRecord(getPath(namespace.base, ["providers"])));
-                    return h("section", { className: "mcf-page", "aria-busy": loading }, h("style", null, MCF_CSS), h("header", { className: "mcf-pageHead", "data-window-drag": true }, h("div", null, h("h1", { className: "mcf-pageTitle" }, t("title")), h("p", { className: "mcf-pageIntro" }, t("intro"))), h("div", { className: "mcf-toolbar" }, typeof renderSlot === "function" ? renderSlot("model-config.action", {}) : null, state.rows.length === 0 ? null : h("button", {
+                    return h("section", {
+                        className: "mcf-page",
+                        "aria-busy": loading,
+                        /* The visual system keys its layout off the active view. */
+                        "data-view": exporting !== null ? "export" : "main"
+                    }, h("style", null, MCF_CSS), h("header", { className: "mcf-pageHead", "data-window-drag": true }, h("div", null, h("h1", { className: "mcf-pageTitle" }, t("title")), h("p", { className: "mcf-pageIntro" }, t("intro"))), h("div", { className: "mcf-toolbar" }, typeof renderSlot === "function" ? renderSlot("model-config.action", {}) : null, state.rows.length === 0 ? null : h("button", {
                         type: "button",
                         className: "mcf-btn mcf-btnSm",
                         onClick: () => startExport(state.rows)
