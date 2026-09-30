@@ -449,7 +449,7 @@ select.mcf-input{appearance:auto;height:34px}
    list's own scrollbar would land outside the visible box and be unreachable.
    max-height caps it on a tall window; min-height keeps about five rows before
    the dialog body starts scrolling instead. */
-.mcf-pickList{flex:1 1 auto;min-height:0;overflow:auto;scrollbar-gutter:stable}
+.mcf-pickList{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;flex-direction:column;display:flex}
 .mcf-candRow{display:flex;gap:8px;align-items:center;padding:6px 10px;cursor:pointer;font-size:12px}
 .mcf-candRow:hover{background:var(--mcf-surface-hover)}
 .mcf-candId{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:var(--mcf-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -494,6 +494,8 @@ select.mcf-input{appearance:auto;height:34px}
 .mcf-splitHead{flex:0 0 auto;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid var(--mcf-border);color:var(--mcf-text-3);font-size:11px;line-height:16px;display:flex;min-width:0}
 .mcf-splitTitle{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mcf-splitItem{align-items:center;gap:8px;padding:7px 10px;border-left:3px solid transparent;cursor:pointer;font-size:12px;line-height:17px;display:flex}
+/* Nav items are buttons, so the UA chrome has to go before the layer styles them. */
+.mcf-splitItem{box-sizing:border-box;appearance:none;border:0;background:transparent;color:inherit;font:inherit;text-align:left}
 .mcf-splitItem:hover{background:var(--mcf-surface)}
 .mcf-splitItem[aria-selected="true"]{background:var(--mcf-accent-soft);border-left-color:var(--mcf-accent)}
 .mcf-splitIcon{flex:none;width:20px;height:20px;border-radius:6px;background:var(--mcf-accent-soft);color:var(--mcf-accent);font-size:10px;font-weight:600;align-items:center;justify-content:center;display:flex}
@@ -835,6 +837,14 @@ body[data-ds-dark-theme] .mcf-popNavItem[aria-selected="true"] .mcf-splitIcon{co
 /* 主色回到插件原色（用户指定：不要 visual-system 的紫） */
 .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574FE8;--mcf-accent-soft:#EEEDFF;--mcf-tag-bg:#F0F0FF;--mcf-tag-line:#E5E3FF;--mcf-accent-line:#DCD9FF;--mcf-ring:#C7C2FF}
 body[data-ds-dark-theme] .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574FE8;--mcf-accent-soft:#26243F;--mcf-tag-bg:#26243F;--mcf-tag-line:#3A3563;--mcf-accent-line:#4B45A8;--mcf-ring:#4B45A8}
+
+/* Plugin additions the locked design does not draw: the reasoning switch and the
+   connectivity test keep the row's shape but take their own grid column. */
+.mcf-page[data-view="main"] .mcf-modelRow{grid-template-columns:minmax(0,1fr) 36px auto 27px}
+.mcf-page[data-view="main"] .mcf-modelRow>.mcf-switch{grid-column:2;grid-row:1}
+.mcf-page[data-view="main"] .mcf-modelRow>.mcf-rowActions{grid-column:3;grid-row:1;justify-self:end;display:flex;align-items:center;gap:6px}
+.mcf-page[data-view="main"] .mcf-modelRow>.mcf-modelMeta:nth-child(3){grid-column:2/4;grid-row:2;justify-self:start}
+.mcf-page[data-view="main"] .mcf-modelRow>.mcf-iconBtn{grid-column:4;grid-row:1/3}
 `;
         /** Render a translate result with `{name}` placeholders filled in. */
         function fill(text, params) {
@@ -2881,7 +2891,7 @@ body[data-ds-dark-theme] .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574F
                         const providerName = row.displayName.length === 0 ? row.provider : row.displayName;
                         return h("div", { className: "mcf-modelBlock", key }, h("div", { className: "mcf-modelRow" }, h("code", { className: "mcf-candId", title: id }, id), name === undefined
                             ? h("span", { className: "mcf-modelMeta" })
-                            : h("span", { className: "mcf-modelMeta", title: name }, name), h("span", { className: "mcf-modelMeta" }, vision ? t("visionOn") : t("vision")), h("span", { className: "mcf-rowActions" }, h("button", {
+                            : h("span", { className: "mcf-modelMeta", title: name }, name), h("span", { className: "mcf-modelMeta" }, t("vision")), h("button", {
                             type: "button",
                             role: "switch",
                             "aria-checked": vision,
@@ -2889,7 +2899,7 @@ body[data-ds-dark-theme] .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574F
                             disabled: !editable || busy[row.provider] === true,
                             "aria-label": fill(t("visionLabel"), { model: id }),
                             onClick: () => void toggleVision(row, index)
-                        }, h("span", { className: "mcf-switchThumb" })), row.settingsPath.length > 0 ? h("button", {
+                        }, h("span", { className: "mcf-switchThumb" })), h("span", { className: "mcf-rowActions" }, row.settingsPath.length > 0 ? h("button", {
                             type: "button",
                             role: "switch",
                             "aria-checked": reasoning,
@@ -2903,7 +2913,7 @@ body[data-ds-dark-theme] .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574F
                             disabled: testing || !row.active,
                             title: row.active ? undefined : t("inactiveHint"),
                             onClick: () => void runTest(row, id, key)
-                        }, testing ? t("testing") : t("test")), editable ? h("button", {
+                        }, testing ? t("testing") : t("test"))), editable ? h("button", {
                             type: "button",
                             className: "mcf-btn mcf-btnSm mcf-iconBtn mcf-iconDanger",
                             disabled: busy[row.provider] === true
@@ -2919,7 +2929,7 @@ body[data-ds-dark-theme] .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574F
                                 title: t("deleteModelTitle"),
                                 detail: fill(t("deleteModelBody"), { model: id, provider: providerName })
                             })
-                        }, h(TrashIcon, {})) : null)), result === undefined || result.status === "testing" ? null : h("p", {
+                        }, h(TrashIcon, {})) : null), result === undefined || result.status === "testing" ? null : h("p", {
                             className: "mcf-testResult " + (result.status === "ok" ? "mcf-testResultOk" : "mcf-testResultFail")
                         }, result.message));
                     };
