@@ -156,7 +156,6 @@ node _probe/mcfg-export-format-test.mjs     # 导出三格式 + 导入解析/计
 node _probe/mcfg-host-test.mjs              # 引用校验、白名单、以及带真实凭据库的路由级测试
 node _probe/mcfg-i18n-test.mjs              # 中英字典键位、占位符与 fill() 参数、死键
 node _probe/audit-ui.mjs                    # CSS 变量/规格与「用了没写、写了没用」的类名
-node _probe/mcfg-layout-shot.mjs            # 抽出真 CSS + 复刻弹窗 DOM，用无头 Chrome 按指定窗口尺寸截图
 node _probe/mcfg-client-bundle-check.mjs    # 运行中的服务是否已提供新的 client 产物
 node _probe/mcfg-live-route-check.mjs       # 运行中的 Host 路由（需已重启进程）
 ```
