@@ -89,12 +89,19 @@ Hover `#FAFAFF` + `#DDDDF0`、展开 `#FBFBFF` + `#DCD9FF` 并带 3px 主色强�
 两字母缩写兜底，并已留好 `<img>` 样式钩子。
 
 两个数据量大的弹窗（导出勾选列表、导入预览）用 `.mcf-modalWide` 放宽到 620px、加高到
-`min(780px, calc(100vh - 64px))`，提供商勾选列表用 `.mcf-pickList`（`flex:0 0 auto` +
-`max-height:min(52vh, 420px)`）：列表**只按内容长高、不被压缩**，窗口够高时一次看全十来个提供商，
-窗口变矮时优先保住列表可读性，由**弹窗正文整块滚动**去够到预览；其余弹窗维持 460px 的窄版。
-固定高度的弹窗里，预览框（`.mcf-modalFixed .mcf-exportText`）是 `flex:1 1 auto`，
-**自适应占满勾选列表和提示之后的剩余高度**（窗口太矮时收到 110px 下限、再由正文滚动兜底），
-不再是一个固定 200px 的小格子；点进预览框自动全选时会同步把滚动条拉回开头，
+`min(780px, calc(100vh - 64px))`；其余弹窗维持 460px 的窄版。导出勾选列表的结构是
+`.mcf-candidates.mcf-pickBox`（flex 子项、`flex:0 1 auto` + `min-height:150px` +
+`max-height:min(52vh,420px)`）套一层 `.mcf-pickList`（`flex:1 1 auto; min-height:0; overflow:auto`）：
+
+- **滚动容器必须是列表本身，不能是外面那层**。`.mcf-candidates` 有 `overflow:hidden`（为了圆角），
+  它又是 body 的 flex 子项、默认可收缩——一旦窗口变矮，被压扁并裁掉的是它，而列表的滚动条会落在
+  可视区之外，怎么滚都滚不到。现在这层只管边框圆角并当 flex 容器，列表自己撑满并加滚动条；
+- 高度是内容驱动的：提供商少时列表按内容长高（7 个约 203px，一次看全），超过 `52vh`/`420px` 才出现滚动条；
+- `.mcf-candHead` 固定不收缩，所以「已选 N/M」和全选按钮在列表滚动时始终可见；
+- 窗口实在塞不下时，最后才轮到弹窗正文整块滚动兜底。
+
+预览框（`.mcf-modalFixed .mcf-exportText`）是 `flex:1 1 auto` + `min-height:110px`，
+**自适应占满勾选列表和提示之后的剩余高度**；点进预览框自动全选时会同步把滚动条拉回开头，
 避免停在 JSON 末尾看起来像被截断。
 
 ## 目录结构
@@ -149,6 +156,7 @@ node _probe/mcfg-export-format-test.mjs     # 导出三格式 + 导入解析/计
 node _probe/mcfg-host-test.mjs              # 引用校验、白名单、以及带真实凭据库的路由级测试
 node _probe/mcfg-i18n-test.mjs              # 中英字典键位、占位符与 fill() 参数、死键
 node _probe/audit-ui.mjs                    # CSS 变量/规格与「用了没写、写了没用」的类名
+node _probe/mcfg-layout-shot.mjs            # 抽出真 CSS + 复刻弹窗 DOM，用无头 Chrome 按指定窗口尺寸截图
 node _probe/mcfg-client-bundle-check.mjs    # 运行中的服务是否已提供新的 client 产物
 node _probe/mcfg-live-route-check.mjs       # 运行中的 Host 路由（需已重启进程）
 ```

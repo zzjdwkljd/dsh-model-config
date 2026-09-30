@@ -464,11 +464,15 @@ select.mcf-input{appearance:auto;height:34px}
 .mcf-candSearch{flex:1;min-width:0}
 .mcf-candActions{display:flex;gap:8px;flex-shrink:0}
 .mcf-candList{max-height:200px;overflow:auto}
-/* The export picker holds every provider at once, so it scrolls only when the
-   window itself is short — never at the two-rows-at-a-time size of 200px.
-   flex:0 0 auto keeps it from being squeezed when the window is small: the
-   dialog body scrolls instead, so the provider list stays readable. */
-.mcf-pickList{flex:0 0 auto;max-height:min(52vh,420px);overflow:auto}
+/* The export picker needs a real scrollbar when the window cannot show every
+   row. The scroll container has to be the list inside the bordered wrapper:
+   the wrapper is the flex item, so if IT were the shrinkable, clipping one the
+   list's own scrollbar would land outside the visible box and be unreachable.
+   max-height caps it on a tall window; min-height keeps about five rows before
+   the dialog body starts scrolling instead. */
+.mcf-pickBox{flex:0 1 auto;min-height:150px;max-height:min(52vh,420px);flex-direction:column;display:flex}
+.mcf-pickBox .mcf-candHead{flex:0 0 auto}
+.mcf-pickList{flex:1 1 auto;min-height:0;overflow:auto;scrollbar-gutter:stable}
 .mcf-candRow{display:flex;gap:8px;align-items:center;padding:6px 10px;cursor:pointer;font-size:12px}
 .mcf-candRow:hover{background:var(--mcf-surface-hover)}
 .mcf-candId{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:var(--mcf-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2809,7 +2813,7 @@ select.mcf-input{appearance:auto;height:34px}
                                     }
                                 }
                             }), t("exportIncludeKey"))), h("div", {
-                                className: "mcf-candidates",
+                                className: "mcf-candidates mcf-pickBox",
                                 role: "group",
                                 "aria-label": t("exportPick")
                             }, h("div", { className: "mcf-candHead" }, h("span", { className: "mcf-candName" }, fill(t("exportPickCount"), { picked: String(pickedRows.length), total: String(rows.length) })), h("div", { className: "mcf-candActions" }, h("button", {
