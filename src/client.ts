@@ -429,6 +429,15 @@ window.__ModuleLoader__.load({
 			models: "Models",
 			modelCount: "{count} models",
 			modelsEmpty: "No models yet. Add one below.",
+			providers: "Providers",
+			factBaseURL: "Base URL",
+			factApi: "Protocol",
+			factKeyRef: "Key reference",
+			factState: "State",
+			stateConfigured: "Configured · key stored",
+			stateNotConfigured: "Not configured",
+			factContext: "Context",
+			visionCount: "{count} vision",
 			addModel: "Add model",
 			modelId: "Model ID",
 			modelName: "Display name",
@@ -588,6 +597,15 @@ window.__ModuleLoader__.load({
 			models: "模型",
 			modelCount: "{count} 个模型",
 			modelsEmpty: "还没有模型，可在下方手动添加。",
+			providers: "提供商",
+			factBaseURL: "接口地址",
+			factApi: "协议",
+			factKeyRef: "密钥引用",
+			factState: "状态",
+			stateConfigured: "已配置 · 密钥已存储",
+			stateNotConfigured: "未配置",
+			factContext: "上下文",
+			visionCount: "识图 {count} 个",
 			addModel: "添加模型",
 			modelId: "模型 ID",
 			modelName: "显示名称",
@@ -745,47 +763,6 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
 .mcf-failure p{margin:0;font-size:13px;line-height:20px}
 .mcf-notice{border-radius:9px;background:var(--mcf-neutral);color:var(--mcf-text-2);margin:0;padding:9px 12px;font-size:12px;line-height:18px}
 .mcf-error{color:var(--mcf-danger);margin:0;font-size:12px;line-height:18px}
-.mcf-groups{flex-direction:column;gap:12px;display:flex}
-.mcf-group{box-sizing:border-box;position:relative;border:1px solid var(--mcf-border);border-radius:16px;background:var(--mcf-surface);flex-direction:column;display:flex;overflow:hidden;transition:background-color 180ms ease-out,border-color 180ms ease-out}
-.mcf-group::before{content:"";position:absolute;top:0;bottom:0;left:0;width:3px;background:var(--mcf-accent);opacity:0;transition:opacity 180ms ease-out}
-.mcf-group:hover:not([data-open=true]){background:var(--mcf-surface-hover);border-color:var(--mcf-border-hover)}
-.mcf-group[data-open=true]{background:var(--mcf-surface-open);border-color:var(--mcf-accent-line)}
-.mcf-group[data-open=true]::before{opacity:1}
-.mcf-provider{box-sizing:border-box;border:0;background:0 0;color:inherit;font:inherit;cursor:pointer;text-align:left;align-items:center;gap:12px;width:100%;padding:12px 16px;display:flex}
-.mcf-provider:focus-visible{outline:2px solid var(--mcf-ring);outline-offset:-3px;border-radius:16px}
-.mcf-providerIcon{box-sizing:border-box;flex:none;justify-content:center;align-items:center;width:32px;height:32px;border-radius:9px;background:var(--mcf-accent-soft);color:var(--mcf-accent);font-size:12px;font-weight:600;line-height:1;letter-spacing:.02em;display:inline-flex;overflow:hidden}
-.mcf-providerIcon img{width:100%;height:100%;object-fit:contain;display:block}
-.mcf-providerIdentity{flex-direction:column;flex:1 1 auto;gap:1px;min-width:0;display:flex}
-.mcf-providerName{color:var(--mcf-text);font-size:14px;font-weight:600;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mcf-providerId{color:var(--mcf-text-3);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mcf-providerMeta{margin-left:auto;flex:none;align-items:center;gap:10px;display:inline-flex}
-.mcf-statusBadge{color:var(--mcf-text-2);white-space:nowrap;align-items:center;gap:6px;font-size:12px;line-height:18px;display:inline-flex}
-.mcf-statusBadge[data-on=false]{color:var(--mcf-text-3)}
-.mcf-dot{box-sizing:border-box;flex:none;width:7px;height:7px;border-radius:50%;background:var(--mcf-accent)}
-.mcf-statusBadge[data-on=false] .mcf-dot{background:0 0;border:1.5px solid var(--mcf-text-3)}
-.mcf-countBadge{box-sizing:border-box;height:22px;padding:0 8px;border-radius:6px;background:var(--mcf-neutral);color:var(--mcf-text-2);white-space:nowrap;font-variant-numeric:tabular-nums;font-size:11px;line-height:22px}
-.mcf-chevron{flex:none;color:var(--mcf-text-3);justify-content:center;align-items:center;width:16px;height:16px;display:inline-flex}
-.mcf-chevron svg{transition:transform 180ms ease-out}
-.mcf-provider[aria-expanded=true] .mcf-chevron svg{transform:rotate(90deg)}
-.mcf-panelWrap{display:grid;grid-template-rows:0fr;transition:grid-template-rows 180ms ease-out}
-.mcf-panelWrap[data-open=true]{grid-template-rows:1fr}
-.mcf-panelClip{min-height:0;overflow:hidden;visibility:hidden;transition:visibility 180ms}
-.mcf-panelWrap[data-open=true] .mcf-panelClip{visibility:visible}
-.mcf-panel{box-sizing:border-box;border-top:1px solid var(--mcf-border);flex-direction:column;gap:12px;padding:14px 16px 16px;display:flex}
-.mcf-panelHead{justify-content:space-between;align-items:center;gap:12px;display:flex}
-.mcf-panelActions{align-items:center;gap:8px;display:flex}
-.mcf-panelTitle{color:var(--mcf-text-3);font-size:11px;font-weight:600;line-height:16px;letter-spacing:.08em;text-transform:uppercase}
-.mcf-models{flex-direction:column;gap:8px;margin:0;padding:0;list-style:none;display:flex}
-.mcf-model{box-sizing:border-box;border:1px solid var(--mcf-border);border-radius:12px;background:var(--mcf-surface);flex-direction:column;gap:8px;padding:12px 14px;display:flex;transition:border-color 180ms ease-out}
-.mcf-model:hover{border-color:var(--mcf-border-hover)}
-.mcf-modelMain{align-items:center;gap:12px;flex-wrap:wrap;display:flex}
-.mcf-modelText{flex-direction:column;flex:1 1 auto;gap:1px;min-width:0;display:flex}
-.mcf-modelId{color:var(--mcf-text);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;font-weight:500;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mcf-modelName{color:var(--mcf-text-2);font-size:12px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mcf-modelActions{margin-left:auto;flex:none;align-items:center;gap:10px;display:inline-flex}
-.mcf-tag{box-sizing:border-box;height:22px;padding:0 8px;border-radius:6px;border:1px solid var(--mcf-tag-line);background:var(--mcf-tag-bg);color:var(--mcf-accent);white-space:nowrap;align-items:center;font-size:11px;font-weight:500;line-height:1;display:inline-flex}
-.mcf-switchWrap{align-items:center;gap:8px;display:inline-flex}
-.mcf-switchLabel{color:var(--mcf-text-2);font-size:12px;line-height:18px}
 .mcf-switch{box-sizing:border-box;position:relative;flex:none;width:44px;height:24px;padding:0;border:0;border-radius:999px;corner-shape:round;background:var(--mcf-track-off);cursor:pointer;font:inherit;transition:background-color 180ms ease-out}
 .mcf-switch[aria-checked=true]{background:var(--mcf-accent)}
 .mcf-switch:disabled{cursor:default;opacity:.45}
@@ -890,6 +867,11 @@ select.mcf-input{appearance:auto;height:34px}
 .mcf-pickName{color:var(--mcf-text);font-size:12px;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (prefers-reduced-motion:reduce){.mcf-spin,.mcf-overlay,.mcf-modal,.mcf-pulse{animation:none}.mcf-group,.mcf-group::before,.mcf-chevron svg,.mcf-panelWrap,.mcf-switch,.mcf-switchThumb,.mcf-model,.mcf-btn,.mcf-input{transition:none}}
 
+/* Main-view detail pieces the visual system styles only through its own selectors. */
+.mcf-modelList{flex-direction:column;display:flex}
+.mcf-modelBlock{min-width:0}
+.mcf-rowActions{flex:none;align-items:center;gap:8px;display:flex}
+.mcf-detailActions{flex:none;align-items:center;gap:6px;display:flex}
 /* Two-pane (master-detail) skeleton: the visual system below styles these
    classes but deliberately does not lay them out, so the base rules live here. */
 .mcf-split{display:grid;grid-template-columns:232px minmax(0,1fr);flex:1 1 auto;min-height:260px;min-width:0;border:1px solid var(--mcf-border);border-radius:10px;overflow:hidden;background:var(--mcf-surface)}
@@ -2505,7 +2487,7 @@ body[data-ds-dark-theme] .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574F
 						rows: [],
 						namespaces: new Map()
 					});
-					const [openId, setOpenId] = React.useState<string | null>(null);
+					const [focusProvider, setFocusProvider] = React.useState<string | null>(null);
 					const [busy, setBusy] = React.useState<Record<string, boolean>>({});
 					const [tests, setTests] = React.useState<Record<string, TestState>>({});
 					const [adding, setAdding] = React.useState<string | null>(null);
@@ -3274,7 +3256,7 @@ body[data-ds-dark-theme] .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574F
 							}
 							setRowError((current) => ({ ...current, [row.provider]: undefined }));
 							setConfirming(null);
-							setOpenId(null);
+							setFocusProvider(null);
 							await load();
 						} finally {
 							setBusy((current) => ({ ...current, [row.provider]: false }));
@@ -3308,6 +3290,7 @@ body[data-ds-dark-theme] .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574F
 					const renderModel = (row: ProviderRow, model: ModelRow, index: number) => {
 						const field = inputFieldOf(row);
 						const vision = effectiveInputTypes(row, index, field).includes("image");
+						const reasoning = reasoningOnOf(model);
 						const id = model.id;
 						const key = `${row.provider}::${id}::${String(index)}`;
 						const result = tests[key];
@@ -3315,44 +3298,32 @@ body[data-ds-dark-theme] .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574F
 						const editable = row.editable && state.writable;
 						const name = typeof model.name === "string" && model.name.length > 0 ? model.name : undefined;
 						const providerName = row.displayName.length === 0 ? row.provider : row.displayName;
-						return h("li", { className: "mcf-model", key },
-							h("div", { className: "mcf-modelMain" },
-								h("div", { className: "mcf-modelText" },
-									h("code", { className: "mcf-modelId", title: id }, id),
-									name === undefined ? null : h("span", { className: "mcf-modelName", title: name }, name)
-								),
-								h("div", { className: "mcf-modelActions" },
-									vision ? h("span", { className: "mcf-tag" }, t("visionOn")) : null,
-									h("span", { className: "mcf-switchWrap" },
-										h("span", { className: "mcf-switchLabel" }, t("vision")),
-										h("button", {
-											type: "button",
-											role: "switch",
-											"aria-checked": vision,
-											className: "mcf-switch",
-											disabled: !editable || busy[row.provider] === true,
-											"aria-label": fill(t("visionLabel"), { model: id }),
-											onClick: () => void toggleVision(row, index)
-										}, h("span", { className: "mcf-switchThumb" }))
-									),
-									row.settingsPath.length > 0 ? (() => {
-										const reasoning = reasoningOnOf(model);
-										return [
-											reasoning ? h("span", { className: "mcf-tag", key: "rtag" }, t("reasoningOn")) : null,
-											h("span", { className: "mcf-switchWrap", key: "rswitch" },
-												h("span", { className: "mcf-switchLabel" }, t("reasoning")),
-												h("button", {
-													type: "button",
-													role: "switch",
-													"aria-checked": reasoning,
-													className: "mcf-switch",
-													disabled: !editable || busy[row.provider] === true,
-													"aria-label": fill(t("reasoningLabel"), { model: id }),
-													onClick: () => void toggleReasoning(row, index)
-												}, h("span", { className: "mcf-switchThumb" }))
-											)
-										];
-									})() : null,
+						return h("div", { className: "mcf-modelBlock", key },
+							h("div", { className: "mcf-modelRow" },
+								h("code", { className: "mcf-candId", title: id }, id),
+								name === undefined
+									? h("span", { className: "mcf-modelMeta" })
+									: h("span", { className: "mcf-modelMeta", title: name }, name),
+								h("span", { className: "mcf-modelMeta" }, vision ? t("visionOn") : t("vision")),
+								h("span", { className: "mcf-rowActions" },
+									h("button", {
+										type: "button",
+										role: "switch",
+										"aria-checked": vision,
+										className: "mcf-switch",
+										disabled: !editable || busy[row.provider] === true,
+										"aria-label": fill(t("visionLabel"), { model: id }),
+										onClick: () => void toggleVision(row, index)
+									}, h("span", { className: "mcf-switchThumb" })),
+									row.settingsPath.length > 0 ? h("button", {
+										type: "button",
+										role: "switch",
+										"aria-checked": reasoning,
+										className: "mcf-switch",
+										disabled: !editable || busy[row.provider] === true,
+										"aria-label": fill(t("reasoningLabel"), { model: id }),
+										onClick: () => void toggleReasoning(row, index)
+									}, h("span", { className: "mcf-switchThumb" })) : null,
 									h("button", {
 										type: "button",
 										className: "mcf-btn mcf-btnSm",
@@ -3385,95 +3356,115 @@ body[data-ds-dark-theme] .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574F
 						);
 					};
 
-					const renderPanel = (row: ProviderRow, panelId: string) => {
+					/** One provider in the left navigation column. */
+					const renderProviderNav = (row: ProviderRow) => {
+						const name = row.displayName.length === 0 ? row.provider : row.displayName;
+						return h("button", {
+							type: "button",
+							className: "mcf-splitItem",
+							key: row.provider,
+							role: "option",
+							"aria-selected": focusProvider === row.provider,
+							onClick: () => {
+								setFocusProvider(row.provider);
+								setAdding(null);
+								setAddError(null);
+							}
+						},
+							h("span", { className: "mcf-splitIcon", "aria-hidden": "true" }, monogramOf(row)),
+							h("span", { className: "mcf-pickName", title: name }, name),
+							h("span", { className: "mcf-modelMeta" }, String(row.models.length))
+						);
+					};
+
+					/** One value of the detail pane's fact list, falling back to a dash. */
+					const factOf = (row: ProviderRow, key: string): string => {
+						const value = getPath(row.profile, [key]);
+						return typeof value === "string" && value.length > 0 ? value : "—";
+					};
+
+					/** The detail pane: interface facts, then that provider's models. */
+					const renderProviderDetail = (row: ProviderRow) => {
 						const editable = row.editable && state.writable;
-						const providerName = row.displayName.length === 0 ? row.provider : row.displayName;
-						return h("div", { className: "mcf-panel", id: panelId },
-							h("div", { className: "mcf-panelHead" },
-								h("span", { className: "mcf-panelTitle" }, t("models")),
-								h("div", { className: "mcf-panelActions" },
-									h("button", {
-										type: "button",
-										className: "mcf-btn mcf-btnSm",
-										"aria-label": `${t("exportLabel")} ${providerName}`,
-										onClick: () => startExport(state.rows, [row.provider])
-									}, t("exportLabel")),
-									editable && canRemoveProvider(row) ? h("button", {
-										type: "button",
-										className: "mcf-btn mcf-btnSm mcf-iconBtn mcf-iconDanger",
-										disabled: busy[row.provider] === true,
-										title: t("deleteProvider"),
-										"aria-label": `${t("deleteProvider")} ${providerName}`,
-										onClick: () => setConfirming({
-											kind: "provider",
-											provider: row.provider,
-											title: t("deleteProviderTitle"),
-											detail: fill(t("deleteProviderBody"), {
-												provider: providerName,
-												count: String(row.models.length)
-											})
-										})
-									}, h(TrashIcon, {})) : null,
+						const visionCount = row.models.filter((model, index) =>
+							effectiveInputTypes(row, index, inputFieldOf(row)).includes("image")).length;
+						const widest = row.models.reduce(
+							(best, model) => Math.max(best, typeof model.contextWindow === "number" ? model.contextWindow : 0), 0);
+						const contextText = widest === 0
+							? "—"
+							: widest >= 1_000_000
+								? `${String(Math.round(widest / 100_000) / 10)}M`
+								: `${String(Math.round(widest / 1_000))}K`;
+						return h("div", { className: "mcf-detail" },
+							h("div", { className: "mcf-detailFacts" },
+								h("dl", { className: "mcf-facts" },
+									h("dt", null, t("factBaseURL")), h("dd", null, factOf(row, "baseURL")),
+									h("dt", null, t("factApi")), h("dd", null, factOf(row, "api")),
+									h("dt", null, t("factKeyRef")), h("dd", null, factOf(row, "apiKeyEnv")),
+									h("dt", null, t("factState")),
+									h("dd", null, row.configured ? t("stateConfigured") : t("stateNotConfigured")),
+									h("dt", null, t("factContext")), h("dd", null, contextText)
+								)
+							),
+							h("div", { className: "mcf-detailModels" },
+								h("div", { className: "mcf-detailBar" },
+									h("span", null,
+										`${fill(t("modelCount"), { count: String(row.models.length) })} · ${fill(t("visionCount"), { count: String(visionCount) })}`),
 									editable ? h("button", {
 										type: "button",
 										className: "mcf-btn mcf-btnSm mcf-btnPrimary",
 										disabled: busy[row.provider] === true,
 										onClick: () => startAdd(row)
 									}, t("addModel")) : null
-								)
-							),
-							row.editable ? null : h("p", { className: "mcf-notice" }, t("notEditable")),
-							row.editable && !state.writable ? h("p", { className: "mcf-notice" }, t("readOnly")) : null,
-							row.directoryError === undefined ? null : h("p", { className: "mcf-error" }, translateRowError(row.directoryError)),
-							row.models.length === 0
-								? h("p", { className: "mcf-status" }, t("modelsEmpty"))
-								: h("ul", { className: "mcf-models" }, row.models.map((model, index) => renderModel(row, model, index))),
-							rowError[row.provider] === undefined ? null : h("p", { className: "mcf-error" }, translateRowError(rowError[row.provider]))
-						);
-					};
-
-					const renderProvider = (row: ProviderRow, index: number) => {
-						const open = openId === row.provider;
-						const panelId = `mcf-panel-${String(index)}`;
-						const name = row.displayName.length === 0 ? row.provider : row.displayName;
-						return h("section", { className: "mcf-group", key: row.provider, "data-open": open ? "true" : "false" },
-							h("button", {
-								type: "button",
-								className: "mcf-provider",
-								"aria-expanded": open,
-								"aria-controls": panelId,
-								onClick: () => {
-									setOpenId(open ? null : row.provider);
-									if (!open) {
-										setAdding(null);
-										setAddError(null);
-									}
-								}
-							},
-								h("span", { className: "mcf-providerIcon", "aria-hidden": "true" }, monogramOf(row)),
-								h("span", { className: "mcf-providerIdentity" },
-									h("span", { className: "mcf-providerName", title: name }, name),
-									row.displayName === row.provider ? null : h("span", { className: "mcf-providerId", title: row.provider }, row.provider)
 								),
-								h("span", { className: "mcf-providerMeta" },
-									h("span", {
-										className: "mcf-statusBadge",
-										"data-on": row.active ? "true" : "false",
-										title: row.active ? undefined : t("inactiveHint")
-									},
-										h("span", { className: "mcf-dot", "aria-hidden": "true" }),
-										row.active ? t("active") : t("inactive")
-									),
-									h("span", { className: "mcf-countBadge" }, fill(t("modelCount"), { count: String(row.models.length) }))
-								),
-								h("span", { className: "mcf-chevron", "aria-hidden": "true" }, h(Chevron, {}))
-							),
-							h("div", { className: "mcf-panelWrap", "data-open": open ? "true" : "false" },
-								h("div", { className: "mcf-panelClip" }, renderPanel(row, panelId))
+								row.editable ? null : h("p", { className: "mcf-notice" }, t("notEditable")),
+								row.editable && !state.writable ? h("p", { className: "mcf-notice" }, t("readOnly")) : null,
+								row.directoryError === undefined
+									? null
+									: h("p", { className: "mcf-error" }, translateRowError(row.directoryError)),
+								row.models.length === 0
+									? h("p", { className: "mcf-status" }, t("modelsEmpty"))
+									: h("div", { className: "mcf-modelList" },
+										row.models.map((model, index) => renderModel(row, model, index))),
+								rowError[row.provider] === undefined
+									? null
+									: h("p", { className: "mcf-error" }, translateRowError(rowError[row.provider]))
 							)
 						);
 					};
 
+					/** The detail head: provider identity plus its own actions. */
+					const renderProviderHead = (row: ProviderRow) => {
+						const editable = row.editable && state.writable;
+						const providerName = row.displayName.length === 0 ? row.provider : row.displayName;
+						return h("div", { className: "mcf-splitHead" },
+							h("span", { className: "mcf-splitTitle" }, `${providerName} · ${row.provider}`),
+							h("span", { className: "mcf-detailActions" },
+								h("button", {
+									type: "button",
+									className: "mcf-btn mcf-btnSm",
+									"aria-label": `${t("exportLabel")} ${providerName}`,
+									onClick: () => startExport(state.rows, [row.provider])
+								}, t("exportLabel")),
+								editable && canRemoveProvider(row) ? h("button", {
+									type: "button",
+									className: "mcf-btn mcf-btnSm mcf-iconDanger",
+									disabled: busy[row.provider] === true,
+									title: t("deleteProvider"),
+									"aria-label": `${t("deleteProvider")} ${providerName}`,
+									onClick: () => setConfirming({
+										kind: "provider",
+										provider: row.provider,
+										title: t("deleteProviderTitle"),
+										detail: fill(t("deleteProviderBody"), {
+											provider: providerName,
+											count: String(row.models.length)
+										})
+									})
+								}, t("deleteProvider")) : null
+							)
+						);
+					};
 					/**
 					* The one overlay the page may show: the add-model dialog, or the
 					* confirmation for a destructive removal. Both live outside the
@@ -4447,6 +4438,8 @@ body[data-ds-dark-theme] .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574F
 					const loading = state.status === "loading" && state.rows.length === 0;
 					const failed = state.status === "error";
 					const renderSlot = props.renderSlot;
+					/* The detail pane follows the selected provider, falling back to the first row. */
+					const focused = state.rows.find((row) => row.provider === focusProvider) ?? state.rows[0];
 					/* A provider can only be hand-declared where a `providers` map exists. */
 					const creatableView = state.writable && [...state.namespaces.values()].some((namespace) =>
 						isRecord(getPath(namespace.value, ["providers"])) || isRecord(getPath(namespace.base, ["providers"]))
@@ -4460,9 +4453,12 @@ body[data-ds-dark-theme] .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574F
 					},
 						h("style", null, MCF_CSS),
 						h("header", { className: "mcf-pageHead", "data-window-drag": true },
-							h("div", null,
-								h("h1", { className: "mcf-pageTitle" }, t("title")),
-								h("p", { className: "mcf-pageIntro" }, t("intro"))
+							h("div", { className: "mcf-pageIdentity" },
+								h("span", { className: "mcf-titleIcon", "aria-hidden": "true" }, h(PanelIcon, { size: 21 })),
+								h("div", null,
+									h("h1", { className: "mcf-pageTitle" }, t("title")),
+									h("p", { className: "mcf-pageIntro" }, t("intro"))
+								)
 							),
 							h("div", { className: "mcf-toolbar" },
 								typeof renderSlot === "function" ? renderSlot("model-config.action", {}) : null,
@@ -4503,7 +4499,21 @@ body[data-ds-dark-theme] .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574F
 							h("button", { type: "button", className: "mcf-btn mcf-btnSm", onClick: load }, t("retry"))
 						) : null,
 						!failed && !loading && state.rows.length === 0 ? h("p", { className: "mcf-status" }, t("empty")) : null,
-						state.rows.length > 0 ? h("div", { className: "mcf-groups" }, state.rows.map(renderProvider)) : null,
+						state.rows.length > 0 ? h("div", { className: "mcf-split" },
+							h("div", { className: "mcf-splitNav" },
+								h("div", { className: "mcf-splitHead" },
+									h("span", null, t("providers")),
+									h("span", { id: "navCount" }, String(state.rows.length))
+								),
+								h("div", { className: "mcf-pickList", role: "listbox", "aria-label": t("providers") },
+									state.rows.map(renderProviderNav))
+							),
+							h("div", { className: "mcf-splitMain" },
+								focused === undefined
+									? h("p", { className: "mcf-splitEmpty" }, t("empty"))
+									: [renderProviderHead(focused), renderProviderDetail(focused)]
+							)
+						) : null,
 						!state.writable && state.rows.length > 0 ? h("p", { className: "mcf-notice" }, t("readOnly")) : null,
 						renderDialog()
 					);
