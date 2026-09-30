@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "Sidebar Model configuration page: provider accordion, manual model add, connectivity test and a per-model vision switch",
+  "description": "Sidebar Model configuration page: provider accordion, manual model add, connectivity test, a per-model vision switch, a per-provider export and an import for the exported JSON/YAML/.env",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",

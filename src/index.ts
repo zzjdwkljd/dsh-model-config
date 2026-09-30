@@ -1,14 +1,22 @@
 /*
- * Host half of the model-config bundle: one browser-reachable probe route.
+ * Host half of the model-config bundle: two browser-reachable routes.
  *
  * The Client page needs one honest answer to "can this provider/model be
  * reached?", and no shipped Remote performs a model call. This half registers
- * a single POST route that runs one tiny completion through the normal `llm`
- * service, so every registered provider route is testable the same way — the
+ * a POST route that runs one tiny completion through the normal `llm` service,
+ * so every registered provider route is testable the same way — the
  * webserver's own trust gate decides whether the request is admitted at all.
  *
- * Type policy: no `any`. The Llm/webserver contracts are declared here as the
- * narrow structural views this plugin actually consumes.
+ * The export feature needs the one fact the Client half cannot reach: the
+ * VALUE behind a provider's `apiKeyEnv` reference. Shipped Remotes only
+ * describe a credential (`configured`/`source`), never return it, so a second
+ * POST route resolves references through the Host `credentials` service. That
+ * route is deliberately narrow: a name is only resolvable when the settings
+ * document itself references it, so the route can never be turned into a
+ * "read any secret by name" oracle.
+ *
+ * Type policy: no `any`. The Llm/webserver/settings/credentials contracts are
+ * declared here as the narrow structural views this plugin actually consumes.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -16,8 +24,25 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 /** Exact route the Client page posts to. */
 const TEST_PATH = "/model-config/test";
 
+/** Exact route the Client page posts to for the export's key values. */
+const SECRETS_PATH = "/model-config/secrets";
+
 /** Open-route request bodies are tiny JSON objects; anything larger is hostile. */
 const MAX_BODY_BYTES = 64 * 1024;
+
+/** A credential reference is a POSIX shell identifier, exactly as the seam brands it. */
+const REF_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** One export asks for at most this many references; more is not a provider catalog. */
+const MAX_REFS = 64;
+
+/**
+ * Bounds on the settings walk that builds the allowed-reference set. The walk
+ * exists to answer "does the configuration actually name this reference?", so
+ * a document larger than these bounds is answered by what was seen so far.
+ */
+const MAX_WALK_NODES = 50000;
+const MAX_WALK_DEPTH = 24;
 
 /** One probe must settle promptly; a hanging endpoint fails the test instead. */
 const PROBE_TIMEOUT_MS = 30000;
@@ -108,10 +133,42 @@ interface HostConnection {
 	requestRejection(request: IncomingMessage): number | undefined;
 }
 
+/** One resolved secret: the plaintext value and the source layer that supplied it. */
+interface ResolvedCredential {
+	value: string;
+	source: string;
+}
+
+/**
+ * The credential seam's read half. `resolve` is the only method this plugin
+ * needs: the value behind an environment-style reference, or `undefined` while
+ * nothing stores it.
+ */
+interface HostCredentialsService {
+	resolve(ref: string): Promise<ResolvedCredential | undefined>;
+}
+
+/** One registered settings namespace as `describe()` reports it. */
+interface HostSettingsDescriptor {
+	ns: string;
+	value: unknown;
+}
+
+/**
+ * The settings seam's read half. `describe()` is called WITHOUT redaction on
+ * purpose: this half runs in the same process, and the whole point of the walk
+ * is to see which reference names the configuration mentions.
+ */
+interface HostSettingsService {
+	describe(options?: { redactSecrets?: boolean }): readonly HostSettingsDescriptor[];
+}
+
 interface HostContext {
 	readonly llm: HostLlmService;
 	readonly webServer: HostWebServer;
 	readonly connection?: HostConnection;
+	readonly settings: HostSettingsService;
+	readonly credentials: HostCredentialsService;
 	effect(callback: () => unknown, label?: string): () => void;
 }
 
@@ -121,6 +178,16 @@ interface ProbeResponse {
 	message: string;
 	finish?: string;
 	usage?: TokenUsage;
+}
+
+/** JSON body the secrets route answers with. */
+interface SecretsResponse {
+	/** Reference name → plaintext value, or null when unconfigured. */
+	values: Record<string, string | null>;
+	/** Requested names the settings document does not mention; never resolved. */
+	refused: string[];
+	/** Requested entries that are not reference names at all. */
+	invalid: string[];
 }
 
 /* ---------------------------------------------------------------------- helpers */
@@ -174,6 +241,132 @@ function failureMessage(reason: FinishReason): string {
 }
 
 /**
+ * Profile keys that carry a credential reference in this configuration family.
+ * Both shipped adapters declare one: `llm-pi-ai` per provider profile, and
+ * `llm-deepseek` at the namespace root.
+ */
+const CREDENTIAL_REF_KEYS: ReadonlySet<string> = new Set(["apikeyenv", "api_key_env"]);
+
+/**
+ * Collect the credential references the settings document declares. Only a
+ * value sitting under a reference-shaped key counts: a settings document is
+ * full of ordinary strings (model ids, display names, base URLs), and admitting
+ * those would turn "read this provider's key" into "read whatever environment
+ * entry the configuration happens to mention".
+ *
+ * The walk is bounded by node count and depth so a pathological document never
+ * turns one export request into unbounded work.
+ * @param value - current node.
+ * @param into - sink collecting the declared references.
+ * @param budget - remaining node visits; shared across the whole document.
+ * @param depth - remaining recursion depth.
+ * @param key - the object key this value sits under, when there is one.
+ */
+export function collectCredentialRefs(
+	value: unknown,
+	into: Set<string>,
+	budget: { left: number },
+	depth: number,
+	key?: string,
+): void {
+	if (budget.left <= 0 || depth < 0) return;
+	budget.left -= 1;
+	if (typeof value === "string") {
+		if (key !== undefined && CREDENTIAL_REF_KEYS.has(key.toLowerCase()) && REF_PATTERN.test(value)) into.add(value);
+		return;
+	}
+	if (Array.isArray(value)) {
+		for (const item of value) collectCredentialRefs(item, into, budget, depth - 1);
+		return;
+	}
+	if (typeof value === "object" && value !== null) {
+		for (const [childKey, entry] of Object.entries(value)) {
+			collectCredentialRefs(entry, into, budget, depth - 1, childKey);
+		}
+	}
+}
+
+/**
+ * Every credential reference the configuration declares. A provider's
+ * `apiKeyEnv` reaches this set because it is a plain string under that key in
+ * its namespace's resolved value, which is exactly the fact that makes a
+ * reference resolvable here.
+ * @param settings - the Host settings service.
+ * @returns the admitted reference names.
+ */
+export function referencedNames(settings: HostSettingsService): Set<string> {
+	const names = new Set<string>();
+	const budget = { left: MAX_WALK_NODES };
+	let descriptors: readonly HostSettingsDescriptor[];
+	try {
+		descriptors = settings.describe();
+	} catch {
+		return names;
+	}
+	for (const descriptor of descriptors) {
+		collectCredentialRefs(descriptor.value, names, budget, MAX_WALK_DEPTH);
+		if (budget.left <= 0) break;
+	}
+	return names;
+}
+
+/**
+ * Split the requested strings into usable reference names and rejected entries,
+ * preserving order and dropping duplicates.
+ * @param raw - the decoded `refs` array.
+ * @returns the names to resolve (at most {@link MAX_REFS}) and the rejected raw entries.
+ */
+export function splitRefs(raw: readonly unknown[]): { refs: string[]; invalid: string[] } {
+	const refs: string[] = [];
+	const invalid: string[] = [];
+	const seen = new Set<string>();
+	for (const entry of raw) {
+		if (typeof entry !== "string") {
+			if (invalid.length < MAX_REFS) invalid.push(String(entry));
+			continue;
+		}
+		if (!REF_PATTERN.test(entry)) {
+			if (invalid.length < MAX_REFS) invalid.push(entry);
+			continue;
+		}
+		if (seen.has(entry)) continue;
+		seen.add(entry);
+		if (refs.length < MAX_REFS) refs.push(entry);
+	}
+	return { refs, invalid };
+}
+
+/**
+ * Resolve the requested references, but only those the settings document names.
+ * A reference the configuration never mentions is reported as refused rather
+ * than silently resolved, so this route cannot read an unrelated secret.
+ * @param ctx - Host context carrying settings and credentials.
+ * @param refs - validated reference names.
+ * @returns per-name values plus the refused names.
+ */
+async function resolveRefs(ctx: HostContext, refs: readonly string[]): Promise<{
+	values: Record<string, string | null>;
+	refused: string[];
+}> {
+	const allowed = referencedNames(ctx.settings);
+	const values: Record<string, string | null> = {};
+	const refused: string[] = [];
+	for (const ref of refs) {
+		if (!allowed.has(ref)) {
+			refused.push(ref);
+			continue;
+		}
+		try {
+			const resolved = await ctx.credentials.resolve(ref);
+			values[ref] = resolved === undefined ? null : resolved.value;
+		} catch {
+			values[ref] = null;
+		}
+	}
+	return { values, refused };
+}
+
+/**
  * Run one minimal completion against a provider route.
  * A `finish` chunk with a non-error kind proves the endpoint answered; every
  * other outcome is reported as the connectivity failure it is.
@@ -221,42 +414,66 @@ async function probeModel(ctx: HostContext, provider: string, model: string): Pr
  * Required Host services; the row stays inactive without them.
  * `connection` must be listed: the context proxy refuses to resolve a service
  * the fiber never injected, so the trust gate below cannot be reached without it.
+ * `settings` and `credentials` back the export's reference resolution.
  */
-export const inject = ["llm", "webServer", "connection"];
+export const inject = ["llm", "webServer", "connection", "settings", "credentials"];
 
-/** Register the probe route for the lifetime of the plugin. */
+/** An admitted request body, or the fact that the response was already sent. */
+type Admitted =
+	| { ok: true; body: Record<string, unknown> | undefined }
+	| { ok: false };
+
+/**
+ * Apply the webserver's trust gate and read one small JSON body, answering the
+ * request itself on every refusal. Shared by both routes so their fences cannot
+ * drift apart.
+ * @param ctx - Host context carrying the connection service.
+ * @param req - the incoming request.
+ * @param res - the response to answer on refusal.
+ * @returns the decoded body, or `{ ok: false }` once a response was sent.
+ */
+async function admitJson(
+	ctx: HostContext,
+	req: IncomingMessage,
+	res: ServerResponse,
+): Promise<Admitted> {
+	const connection = ctx.connection;
+	if (connection === undefined) {
+		sendJson(res, 503, { ok: false, message: "connection service unavailable" });
+		return { ok: false };
+	}
+	const rejection = connection.requestRejection(req);
+	if (rejection !== undefined) {
+		res.statusCode = rejection;
+		res.end();
+		return { ok: false };
+	}
+	if (req.method !== "POST") {
+		res.setHeader("allow", "POST");
+		sendJson(res, 405, { ok: false, message: "method not allowed" });
+		return { ok: false };
+	}
+	let decoded: unknown;
+	try {
+		decoded = JSON.parse(await readBody(req));
+	} catch {
+		sendJson(res, 400, { ok: false, message: "invalid JSON body" });
+		return { ok: false };
+	}
+	return { ok: true, body: isRecord(decoded) ? decoded : undefined };
+}
+
+/** Register both browser routes for the lifetime of the plugin. */
 export function apply(ctx: HostContext): void {
 	ctx.effect(() => ctx.webServer.register({
 		kind: "exact",
 		path: TEST_PATH,
 		handler: async (req, res) => {
 			try {
-				const connection = ctx.connection;
-				if (connection === undefined) {
-					sendJson(res, 503, { ok: false, message: "connection service unavailable" });
-					return;
-				}
-				const rejection = connection.requestRejection(req);
-				if (rejection !== undefined) {
-					res.statusCode = rejection;
-					res.end();
-					return;
-				}
-				if (req.method !== "POST") {
-					res.setHeader("allow", "POST");
-					sendJson(res, 405, { ok: false, message: "method not allowed" });
-					return;
-				}
-				let decoded: unknown;
-				try {
-					decoded = JSON.parse(await readBody(req));
-				} catch {
-					sendJson(res, 400, { ok: false, message: "invalid JSON body" });
-					return;
-				}
-				const body = isRecord(decoded) ? decoded : undefined;
-				const provider = typeof body?.provider === "string" ? body.provider : "";
-				const model = typeof body?.model === "string" ? body.model : "";
+				const admitted = await admitJson(ctx, req, res);
+				if (!admitted.ok) return;
+				const provider = typeof admitted.body?.provider === "string" ? admitted.body.provider : "";
+				const model = typeof admitted.body?.model === "string" ? admitted.body.model : "";
 				if (provider.length === 0 || model.length === 0) {
 					sendJson(res, 400, { ok: false, message: "provider and model are required" });
 					return;
@@ -267,4 +484,35 @@ export function apply(ctx: HostContext): void {
 			}
 		}
 	}), "model-config: POST /model-config/test");
+
+	/*
+	 * The export's secret half. Answers only for references the settings
+	 * document names, so this is a lookup for the configuration's own keys
+	 * rather than a general credential dump.
+	 */
+	ctx.effect(() => ctx.webServer.register({
+		kind: "exact",
+		path: SECRETS_PATH,
+		handler: async (req, res) => {
+			try {
+				const admitted = await admitJson(ctx, req, res);
+				if (!admitted.ok) return;
+				const raw = admitted.body?.refs;
+				if (!Array.isArray(raw)) {
+					sendJson(res, 400, { ok: false, message: "refs must be an array of reference names" });
+					return;
+				}
+				const { refs, invalid } = splitRefs(raw);
+				const resolved = await resolveRefs(ctx, refs);
+				const payload: SecretsResponse = {
+					values: resolved.values,
+					refused: resolved.refused,
+					invalid
+				};
+				sendJson(res, 200, payload);
+			} catch (error) {
+				sendJson(res, 500, { ok: false, message: messageOf(error) });
+			}
+		}
+	}), "model-config: POST /model-config/secrets");
 }

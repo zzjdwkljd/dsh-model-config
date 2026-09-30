@@ -24,6 +24,8 @@ window.__ModuleLoader__.load({
         const PANEL_ID = "model-config";
         /** The Host half's probe route, same origin as this page. */
         const TEST_PATH = "/model-config/test";
+        /** The Host half's credential route, the only source of plaintext key values. */
+        const SECRETS_PATH = "/model-config/secrets";
         /** English strings (the key-set source of truth for this pair). */
         const en = {
             panel: "Model config",
@@ -112,7 +114,74 @@ window.__ModuleLoader__.load({
             addModelRow: "Add a model",
             removeRow: "Remove",
             needOneModel: "Add at least one model.",
-            create: "Create"
+            create: "Create",
+            exportLabel: "Export",
+            exportAll: "Export all",
+            exportTitleOne: "Export {provider}",
+            exportTitleAll: "Export all providers",
+            exportSub: "A read-only snapshot of what this configuration holds. Exporting only writes the file you save.",
+            exportFormat: "Format",
+            exportFormatJson: "JSON — full record",
+            exportFormatYaml: "YAML — configuration snippet",
+            exportFormatEnv: ".env — keys only",
+            exportScope: "{count} providers · {models} models",
+            exportIncludeKey: "Include the API key in plain text",
+            exportPick: "Providers to export",
+            exportPickCount: "{picked}/{total} selected",
+            exportPickAll: "Select all",
+            exportPickNone: "Select none",
+            exportPickModels: "{count} models",
+            exportPickEmpty: "Pick at least one provider.",
+            exportTitlePicked: "{count} providers selected",
+            exportRefsNone: "These providers declare no API key reference, so no key can be exported.",
+            exportKeyLoading: "Reading the key from the credential store…",
+            exportKeyMissing: "Not stored yet: {refs}",
+            exportKeyRefused: "Not named by the configuration: {refs}",
+            exportKeyFailed: "Could not read the key: {message}",
+            exportKeyOff: "The key is left out. Switch the option on to read it from the credential store.",
+            exportCopy: "Copy",
+            exportCopied: "Copied",
+            exportCopyFailed: "Copy failed — select the text and copy it manually.",
+            exportSave: "Save file",
+            exportWarning: "The exported file contains a plaintext API key. Keep it private.",
+            exportHostStale: "The Host half is not answering yet, so the key cannot be read. Restart DSH (or toggle this plugin) and try again — every other field is already in the export.",
+            importLabel: "Import",
+            importTitle: "Import configuration",
+            importSub: "Paste an export below or pick the file you saved. Nothing is written until you confirm.",
+            importFormat: "Format",
+            importFormatAuto: "Detect automatically",
+            importFormatJson: "JSON — full record",
+            importFormatYaml: "YAML — configuration snippet",
+            importFormatEnv: ".env — keys only",
+            importPickFile: "Choose file…",
+            importPlaceholder: "Paste the exported JSON, YAML, or .env here.",
+            importScope: "{add} new · {replace} replaced · {skipped} skipped · {models} models",
+            importNew: "new",
+            importReplace: "replace",
+            importSkip: "skip",
+            importIncludeKeys: "Write the keys this document carries into the credential store",
+            importKeysLine: "{count} keys will be written.",
+            importKeysNone: "This document carries no keys.",
+            importReplaceWarn: "Replacing writes over what the configuration holds at those paths.",
+            importApply: "Import {count}",
+            importBusy: "Importing…",
+            importedFlash: "{count} providers imported, {keys} keys stored.",
+            importReadFailed: "Could not read the file: {message}",
+            importNsFailed: "{ns}: {message}",
+            importKeyFailed: "Key {ref}: {message}",
+            importUnknownProvider: "cannot tell which provider route this section belongs to",
+            importBadRoute: "not a valid provider route: {route}",
+            importNoNamespace: "this configuration has no {ns} settings section",
+            importNoModels: "a provider needs at least one model",
+            importErrEmpty: "Nothing to read yet.",
+            importErrNoProviders: "No providers found in this document.",
+            importErrNoKeys: "No KEY=value lines found.",
+            importErrShape: "Not an export document: expected a providers list or one provider record.",
+            importErrMapping: "The YAML root has to be a mapping of settings namespaces.",
+            importErrYaml: "This YAML is outside the subset this plugin writes. Use the JSON export instead.",
+            importErrParse: "Could not read the document: {message}",
+            importErrTooLarge: "This text is too large to read in the dialog. Save it as a file and import it from disk.",
+            importReadOnly: "The settings document is read-only in this deployment, so nothing can be imported."
         };
         /** Chinese strings. */
         const zh = {
@@ -202,12 +271,79 @@ window.__ModuleLoader__.load({
             addModelRow: "添加一个模型",
             removeRow: "移除",
             needOneModel: "至少填写一个模型。",
-            create: "创建"
+            create: "创建",
+            exportLabel: "导出",
+            exportAll: "导出全部",
+            exportTitleOne: "导出「{provider}」",
+            exportTitleAll: "导出全部提供商",
+            exportSub: "这是当前配置的只读快照，除了保存文件不会改动任何设置。",
+            exportFormat: "格式",
+            exportFormatJson: "JSON — 完整记录",
+            exportFormatYaml: "YAML — 配置片段",
+            exportFormatEnv: ".env — 仅密钥",
+            exportScope: "{count} 个提供商 · {models} 个模型",
+            exportIncludeKey: "以明文包含密钥",
+            exportPick: "要导出的提供商",
+            exportPickCount: "已选 {picked}/{total}",
+            exportPickAll: "全选",
+            exportPickNone: "全不选",
+            exportPickModels: "{count} 个模型",
+            exportPickEmpty: "至少选择一个提供商。",
+            exportTitlePicked: "已选 {count} 个提供商",
+            exportRefsNone: "这些提供商没有声明密钥引用，无法导出密钥。",
+            exportKeyLoading: "正在从凭据库读取密钥…",
+            exportKeyMissing: "尚未存储：{refs}",
+            exportKeyRefused: "配置中未引用：{refs}",
+            exportKeyFailed: "读取密钥失败：{message}",
+            exportKeyOff: "当前不含密钥；打开上面的选项即可从凭据库读取。",
+            exportCopy: "复制",
+            exportCopied: "已复制",
+            exportCopyFailed: "复制失败，请手动全选复制。",
+            exportSave: "保存文件",
+            exportWarning: "导出文件包含明文密钥，请妥善保管。",
+            exportHostStale: "Host 端尚未响应，暂时读不到密钥。重启 DSH（或重新启用本插件）后再试——其他字段已经包含在导出里了。",
+            importLabel: "导入",
+            importTitle: "导入配置",
+            importSub: "把导出内容粘在下面，或选择你保存的文件。确认之前不会写入任何东西。",
+            importFormat: "格式",
+            importFormatAuto: "自动识别",
+            importFormatJson: "JSON — 完整记录",
+            importFormatYaml: "YAML — 配置片段",
+            importFormatEnv: ".env — 仅密钥",
+            importPickFile: "选择文件…",
+            importPlaceholder: "把导出的 JSON、YAML 或 .env 粘到这里。",
+            importScope: "新增 {add} · 覆盖 {replace} · 跳过 {skipped} · 模型 {models}",
+            importNew: "新增",
+            importReplace: "覆盖",
+            importSkip: "跳过",
+            importIncludeKeys: "把文档里的密钥写入凭据库",
+            importKeysLine: "将写入 {count} 个密钥。",
+            importKeysNone: "这份文档不含密钥。",
+            importReplaceWarn: "「覆盖」会替换配置里对应路径上的原有内容。",
+            importApply: "导入 {count} 个",
+            importBusy: "导入中…",
+            importedFlash: "已导入 {count} 个提供商，写入 {keys} 个密钥。",
+            importReadFailed: "读取文件失败：{message}",
+            importNsFailed: "{ns}：{message}",
+            importKeyFailed: "密钥 {ref}：{message}",
+            importUnknownProvider: "无法判断这一段属于哪个提供商路由",
+            importBadRoute: "不是合法的提供商路由：{route}",
+            importNoNamespace: "当前配置没有 {ns} 设置分区",
+            importNoModels: "提供商至少要有一个模型",
+            importErrEmpty: "还没有可读取的内容。",
+            importErrNoProviders: "这份文档里没有找到提供商。",
+            importErrNoKeys: "没有找到 KEY=value 行。",
+            importErrShape: "不是导出文档：需要 providers 列表或单条提供商记录。",
+            importErrMapping: "YAML 根节点需要是「设置分区 → 内容」的映射。",
+            importErrYaml: "这段 YAML 超出了本插件写出的子集，请改用 JSON 导出。",
+            importErrParse: "无法解析文档：{message}",
+            importErrTooLarge: "内容太大，无法在弹窗里读取。请先存成文件再导入。",
+            importReadOnly: "当前部署的设置文档是只读的，无法导入。"
         };
         /** Component-local styles; unmounting the page removes them with it. */
         const MCF_CSS = `
-.mcf-page{box-sizing:border-box;height:100%;overflow:auto;flex-direction:column;align-items:center;gap:24px;padding:0 32px 56px;display:flex;background:var(--mcf-bg);color:var(--mcf-text);font-family:var(--dsw-font-family,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif);font-size:14px;line-height:22px;--mcf-accent:#635BFF;--mcf-accent-hover:#574FE8;--mcf-accent-soft:#EEEDFF;--mcf-tag-bg:#F0F0FF;--mcf-tag-line:#E5E3FF;--mcf-accent-line:#DCD9FF;--mcf-ring:#C7C2FF;--mcf-bg:#F6F7F9;--mcf-surface:#FFFFFF;--mcf-surface-hover:#FAFAFF;--mcf-surface-open:#FBFBFF;--mcf-text:#18181B;--mcf-text-2:#71717A;--mcf-text-3:#A1A1AA;--mcf-border:#E8E8EC;--mcf-border-hover:#DDDDF0;--mcf-neutral:#F4F4F5;--mcf-track-off:#D9DCE3;--mcf-ghost-border:#E4E4E7;--mcf-ghost-text:#52525B;--mcf-danger:#D92D20;--mcf-danger-strong:#B42318;--mcf-danger-soft:#FEF3F2;--mcf-danger-line:#FDA29B;--mcf-scrim:#18181B66;--mcf-success:#067647}
-body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-surface-hover:#1F1F24;--mcf-surface-open:#1A1922;--mcf-text:#FAFAFA;--mcf-text-2:#A1A1AA;--mcf-text-3:#71717A;--mcf-border:#27272A;--mcf-border-hover:#3A3A45;--mcf-neutral:#232327;--mcf-accent-soft:#26243F;--mcf-tag-bg:#26243F;--mcf-tag-line:#3A3563;--mcf-accent-line:#4B45A8;--mcf-ring:#4B45A8;--mcf-track-off:#3F3F46;--mcf-ghost-border:#3F3F46;--mcf-ghost-text:#D4D4D8;--mcf-danger:#F97066;--mcf-danger-strong:#D92D20;--mcf-danger-soft:#3A1A18;--mcf-danger-line:#7A2A24;--mcf-scrim:#000000A6}
+.mcf-page{box-sizing:border-box;height:100%;overflow:auto;flex-direction:column;align-items:center;gap:24px;padding:0 32px 56px;display:flex;background:var(--mcf-bg);color:var(--mcf-text);font-family:var(--dsw-font-family,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif);font-size:14px;line-height:22px;--mcf-accent:#635BFF;--mcf-accent-hover:#574FE8;--mcf-accent-soft:#EEEDFF;--mcf-tag-bg:#F0F0FF;--mcf-tag-line:#E5E3FF;--mcf-accent-line:#DCD9FF;--mcf-ring:#C7C2FF;--mcf-bg:#F6F7F9;--mcf-surface:#FFFFFF;--mcf-surface-hover:#FAFAFF;--mcf-surface-open:#FBFBFF;--mcf-text:#18181B;--mcf-text-2:#71717A;--mcf-text-3:#A1A1AA;--mcf-border:#E8E8EC;--mcf-border-hover:#DDDDF0;--mcf-neutral:#F4F4F5;--mcf-track-off:#D9DCE3;--mcf-ghost-border:#E4E4E7;--mcf-ghost-text:#52525B;--mcf-danger:#D92D20;--mcf-danger-strong:#B42318;--mcf-danger-soft:#FEF3F2;--mcf-danger-line:#FDA29B;--mcf-scrim:#18181B66;--mcf-success:#067647;--mcf-warn:#B54708}
+body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-surface-hover:#1F1F24;--mcf-surface-open:#1A1922;--mcf-text:#FAFAFA;--mcf-text-2:#A1A1AA;--mcf-text-3:#71717A;--mcf-border:#27272A;--mcf-border-hover:#3A3A45;--mcf-neutral:#232327;--mcf-accent-soft:#26243F;--mcf-tag-bg:#26243F;--mcf-tag-line:#3A3563;--mcf-accent-line:#4B45A8;--mcf-ring:#4B45A8;--mcf-track-off:#3F3F46;--mcf-ghost-border:#3F3F46;--mcf-ghost-text:#D4D4D8;--mcf-danger:#F97066;--mcf-danger-strong:#D92D20;--mcf-danger-soft:#3A1A18;--mcf-danger-line:#7A2A24;--mcf-scrim:#000000A6;--mcf-warn:#FDB022}
 .mcf-page>*{width:100%;max-width:1104px}
 .mcf-pageHead{box-sizing:border-box;justify-content:space-between;align-items:flex-start;gap:16px;padding-top:32px;display:flex}
 .mcf-pageTitle{margin:0;color:var(--mcf-text);font-size:20px;font-weight:600;line-height:28px;letter-spacing:-.01em}
@@ -294,6 +430,9 @@ body[data-ds-dark-theme] .mcf-page{--mcf-bg:#0F0F11;--mcf-surface:#18181B;--mcf-
 @keyframes mcf-rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .mcf-modal{box-sizing:border-box;width:100%;max-width:460px;background:var(--mcf-surface);border:1px solid var(--mcf-border);border-radius:16px;box-shadow:0 16px 40px #18181B26;flex-direction:column;display:flex;animation:mcf-rise 160ms ease-out}
 .mcf-modalFixed{height:min(640px,calc(100vh - 96px))}
+/* Data-heavy dialogs (export picker, import preview): wider box, taller body. */
+.mcf-modalWide{max-width:620px}
+.mcf-modalFixed.mcf-modalWide{height:min(780px,calc(100vh - 64px))}
 .mcf-modalFixed .mcf-modalBody{flex:1 1 auto;min-height:0;overflow:auto}
 .mcf-modalHead{justify-content:space-between;align-items:flex-start;gap:12px;padding:18px 18px 0;display:flex}
 .mcf-modalTitle{margin:0;color:var(--mcf-text);font-size:15px;font-weight:600;line-height:22px}
@@ -325,10 +464,34 @@ select.mcf-input{appearance:auto;height:34px}
 .mcf-candSearch{flex:1;min-width:0}
 .mcf-candActions{display:flex;gap:8px;flex-shrink:0}
 .mcf-candList{max-height:200px;overflow:auto}
+/* The export picker holds every provider at once, so it scrolls only when the
+   window itself is short — never at the two-rows-at-a-time size of 200px. */
+.mcf-pickList{max-height:min(52vh,420px);overflow:auto}
 .mcf-candRow{display:flex;gap:8px;align-items:center;padding:6px 10px;cursor:pointer;font-size:12px}
 .mcf-candRow:hover{background:var(--mcf-surface-hover)}
 .mcf-candId{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:var(--mcf-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mcf-candName{color:var(--mcf-text-3);flex-shrink:0}
+.mcf-exportOpts{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 16px}
+.mcf-exportOpts>*{flex:none}
+.mcf-exportSelect{width:280px}
+.mcf-exportText{box-sizing:border-box;width:100%;min-height:200px;max-height:360px;resize:vertical;margin:0;padding:10px 12px;border:1px solid var(--mcf-border);border-radius:9px;background:var(--mcf-neutral);color:var(--mcf-text);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:18px;white-space:pre;overflow:auto}
+.mcf-exportText:focus{outline:none;border-color:var(--mcf-accent)}
+.mcf-exportNote{margin:0;color:var(--mcf-text-3);font-size:11px;line-height:16px}
+.mcf-exportWarn{margin:0;color:var(--mcf-danger);font-size:11px;line-height:16px}
+.mcf-importList{box-sizing:border-box;width:100%;max-height:min(44vh,360px);overflow:auto;margin:0;padding:0;border:1px solid var(--mcf-border);border-radius:9px;background:var(--mcf-neutral);list-style:none}
+.mcf-importItem{display:flex;align-items:baseline;gap:8px;padding:7px 10px;border-top:1px solid var(--mcf-border);font-size:12px;line-height:17px}
+.mcf-importItem:first-child{border-top:0}
+.mcf-importName{color:var(--mcf-text);font-weight:600;flex:none}
+.mcf-importMeta{color:var(--mcf-text-3);font-size:11px;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcf-importBadge{flex:none;padding:1px 7px;border-radius:999px;border:1px solid var(--mcf-border);color:var(--mcf-text-3);font-size:10px;line-height:15px}
+.mcf-importBadgeNew{border-color:var(--mcf-accent);color:var(--mcf-accent)}
+.mcf-importBadgeReplace{border-color:var(--mcf-warn);color:var(--mcf-warn)}
+.mcf-importBadgeSkip{border-color:var(--mcf-border);color:var(--mcf-text-3)}
+.mcf-importReason{color:var(--mcf-text-3);font-size:11px;line-height:16px}
+.mcf-importError{margin:0;color:var(--mcf-danger);font-size:11px;line-height:16px;white-space:pre-line}
+.mcf-importFile{display:none}
+.mcf-pickName{color:var(--mcf-text);font-size:12px;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcf-copied{color:var(--mcf-success);font-size:12px;line-height:18px}
 @media (prefers-reduced-motion:reduce){.mcf-spin,.mcf-overlay,.mcf-modal,.mcf-pulse{animation:none}.mcf-group,.mcf-group::before,.mcf-chevron svg,.mcf-panelWrap,.mcf-switch,.mcf-switchThumb,.mcf-model,.mcf-btn,.mcf-input{transition:none}}
 `;
         /** Render a translate result with `{name}` placeholders filled in. */
@@ -656,6 +819,838 @@ select.mcf-input{appearance:auto;height:34px}
                 return { ok: false, message: messageOf(error) };
             }
         }
+        /* ------------------------------------------------------------ export helpers */
+        /** Deep-copy one JSON value without asserting a parsed shape. */
+        function cloneJson(value) {
+            if (Array.isArray(value))
+                return value.map((item) => cloneJson(item) ?? null);
+            if (isJsonObject(value)) {
+                const copy = {};
+                for (const [key, entry] of Object.entries(value)) {
+                    if (entry === undefined)
+                        continue;
+                    copy[key] = cloneJson(entry) ?? null;
+                }
+                return copy;
+            }
+            return value;
+        }
+        /** A non-empty string profile field, or null when the profile carries none. */
+        function profileString(row, key) {
+            const value = getPath(row.profile, [key]);
+            return typeof value === "string" && value.length > 0 ? value : null;
+        }
+        /** The credential reference a provider's profile declares, when it declares one. */
+        function keyRefOf(row) {
+            const value = getPath(row.profile, ["apiKeyEnv"]);
+            return typeof value === "string" && value.length > 0 ? value : undefined;
+        }
+        /** Every credential reference the given providers declare, deduplicated in order. */
+        function keyRefsOf(rows) {
+            const refs = [];
+            for (const row of rows) {
+                const ref = keyRefOf(row);
+                if (ref !== undefined && !refs.includes(ref))
+                    refs.push(ref);
+            }
+            return refs;
+        }
+        /** One provider's export record; the key is stated only when it was read and asked for. */
+        function exportedProviderOf(row, secrets, includeKey) {
+            const ref = keyRefOf(row) ?? null;
+            const value = ref === null ? undefined : secrets[ref];
+            const models = row.models.map((model) => {
+                const copy = { id: model.id };
+                for (const [key, entry] of Object.entries(model)) {
+                    if (key === "id" || entry === undefined)
+                        continue;
+                    copy[key] = cloneJson(entry) ?? null;
+                }
+                return copy;
+            });
+            return {
+                provider: row.provider,
+                displayName: row.displayName,
+                settingsNs: row.settingsNs,
+                settingsPath: [...row.settingsPath],
+                profile: cloneJson(row.profile) ?? null,
+                api: profileString(row, "api"),
+                baseURL: profileString(row, "baseURL"),
+                apiKeyEnv: ref,
+                apiKey: includeKey && value !== undefined ? value : null,
+                active: row.active,
+                models
+            };
+        }
+        /** The complete export document for the chosen providers. */
+        function exportDocumentOf(rows, secrets, includeKey, at) {
+            return {
+                version: 1,
+                exportedAt: at,
+                providers: rows.map((row) => exportedProviderOf(row, secrets, includeKey))
+            };
+        }
+        /** Whether a string has to be quoted to stay a YAML scalar. */
+        function yamlNeedsQuotes(text) {
+            if (text.length === 0)
+                return true;
+            if (/^\s|\s$/.test(text))
+                return true;
+            if (/^(?:true|false|yes|no|on|off|null|~)$/i.test(text))
+                return true;
+            if (/^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/.test(text))
+                return true;
+            /* YAML's own special floats; a bare `.inf` would come back as Infinity. */
+            if (/^[-+]?\.(?:inf|nan)$/i.test(text))
+                return true;
+            if (/^[-,?:[\]{}#&*!|>'"%@`]/.test(text))
+                return true;
+            /* A `#` anywhere may open a comment, and a trailing `:` may read as a key. */
+            if (/#/.test(text) || /:$/.test(text))
+                return true;
+            if (/:\s/.test(text))
+                return true;
+            if (/[\n\r\t]/.test(text))
+                return true;
+            return false;
+        }
+        /** One YAML scalar; JSON string escaping is a valid YAML double-quoted form. */
+        function yamlScalar(text) {
+            return yamlNeedsQuotes(text) ? JSON.stringify(text) : text;
+        }
+        /** One non-container YAML value. */
+        function yamlPrimitive(value) {
+            if (value === undefined || value === null)
+                return "null";
+            if (typeof value === "string")
+                return yamlScalar(value);
+            if (typeof value === "boolean")
+                return value ? "true" : "false";
+            return String(value);
+        }
+        /**
+         * Emit one JSON value as YAML block lines at a given indent. Containers get
+         * their own lines; scalars print inline for their key, or as a `-` item.
+         * @param value - the value to emit.
+         * @param indent - current indentation width.
+         * @param lines - sink the lines are appended to.
+         */
+        function emitYaml(value, indent, lines) {
+            const pad = " ".repeat(indent);
+            if (Array.isArray(value)) {
+                for (const item of value) {
+                    if (Array.isArray(item) || isJsonObject(item)) {
+                        if (Array.isArray(item) && item.length === 0) {
+                            lines.push(`${pad}- []`);
+                            continue;
+                        }
+                        if (isJsonObject(item) && Object.keys(item).length === 0) {
+                            lines.push(`${pad}- {}`);
+                            continue;
+                        }
+                        lines.push(`${pad}-`);
+                        emitYaml(item, indent + 2, lines);
+                        continue;
+                    }
+                    lines.push(`${pad}- ${yamlPrimitive(item)}`);
+                }
+                return;
+            }
+            if (isJsonObject(value)) {
+                for (const [key, entry] of Object.entries(value)) {
+                    if (entry === undefined)
+                        continue;
+                    const label = yamlScalar(key);
+                    if (Array.isArray(entry) || isJsonObject(entry)) {
+                        if (Array.isArray(entry) && entry.length === 0) {
+                            lines.push(`${pad}${label}: []`);
+                            continue;
+                        }
+                        if (isJsonObject(entry) && Object.keys(entry).length === 0) {
+                            lines.push(`${pad}${label}: {}`);
+                            continue;
+                        }
+                        lines.push(`${pad}${label}:`);
+                        emitYaml(entry, indent + 2, lines);
+                        continue;
+                    }
+                    lines.push(`${pad}${label}: ${yamlPrimitive(entry)}`);
+                }
+                return;
+            }
+            lines.push(`${pad}${yamlPrimitive(value)}`);
+        }
+        /**
+         * The configuration-snippet export: one namespace section per settings
+         * namespace, each provider profile placed at its own settings path, exactly
+         * where the settings document keeps it — so the block pastes back into a
+         * profile patch unchanged. Keys live in the credential store rather than the
+         * document, so they are listed as comments.
+         * @param rows - the providers to export.
+         * @param secrets - reference → value as the Host half answered.
+         * @param includeKey - whether the key comments are written.
+         * @param at - ISO instant of the export.
+         * @returns the YAML text.
+         */
+        function exportYaml(rows, secrets, includeKey, at) {
+            const lines = [
+                "# model-config export",
+                `# exportedAt: ${at}`,
+                "# Each top-level section is a settings namespace; paste it into settings.yaml",
+                "# or a profile cordis.patch.yml, keeping the section name as the key."
+            ];
+            const refs = keyRefsOf(rows);
+            if (includeKey && refs.length > 0) {
+                lines.push("#", "# API keys (stored in the credential store, not in this document):");
+                for (const ref of refs) {
+                    const value = secrets[ref];
+                    lines.push(value === undefined ? `# ${ref}=<not stored>` : `# ${ref}=${value}`);
+                }
+            }
+            const tree = {};
+            const skipped = [];
+            for (const row of rows) {
+                if (row.settingsNs.length === 0 || !isJsonObject(row.profile)) {
+                    skipped.push(row.provider);
+                    continue;
+                }
+                let section = tree[row.settingsNs];
+                if (!isJsonObject(section)) {
+                    section = {};
+                    tree[row.settingsNs] = section;
+                }
+                const path = row.settingsPath;
+                if (path.length === 0) {
+                    const copy = cloneJson(row.profile);
+                    if (isJsonObject(copy))
+                        tree[row.settingsNs] = copy;
+                    continue;
+                }
+                let cursor = section;
+                for (const key of path.slice(0, -1)) {
+                    const next = cursor[key];
+                    if (!isJsonObject(next)) {
+                        const created = {};
+                        cursor[key] = created;
+                        cursor = created;
+                        continue;
+                    }
+                    cursor = next;
+                }
+                const leaf = path[path.length - 1];
+                if (leaf !== undefined)
+                    cursor[leaf] = cloneJson(row.profile) ?? null;
+            }
+            if (skipped.length > 0)
+                lines.push("#", `# not configured, skipped: ${skipped.join(", ")}`);
+            if (Object.keys(tree).length === 0) {
+                lines.push("#", "# nothing to export");
+                return `${lines.join("\n")}\n`;
+            }
+            lines.push("");
+            emitYaml(tree, 0, lines);
+            return `${lines.join("\n")}\n`;
+        }
+        /** The `.env` export: one `REF=value` line per declared key reference. */
+        function exportEnv(rows, secrets, at) {
+            const lines = [`# model-config export ${at}`];
+            const refs = keyRefsOf(rows);
+            for (const ref of refs) {
+                const value = secrets[ref];
+                lines.push(value === undefined ? `# not stored: ${ref}` : `${ref}=${value}`);
+            }
+            return `${lines.join("\n")}\n`;
+        }
+        /** Render the export in the chosen format. */
+        function renderExport(format, rows, secrets, includeKey, at) {
+            if (format === "yaml")
+                return exportYaml(rows, secrets, includeKey, at);
+            if (format === "env")
+                return exportEnv(rows, secrets, at);
+            return `${JSON.stringify(exportDocumentOf(rows, secrets, includeKey, at), null, 2)}\n`;
+        }
+        /** The MIME type one export format is saved with. */
+        function exportMime(format) {
+            if (format === "json")
+                return "application/json";
+            if (format === "yaml")
+                return "text/yaml";
+            return "text/plain";
+        }
+        /**
+         * A dated file name for one export.
+         * @param rows - the providers being exported.
+         * @param format - the export format, used as the extension.
+         * @param at - ISO instant of the export.
+         * @param total - how many providers the dialog offered; when the selection is
+         * a strict subset of that, the name says how many were chosen instead of
+         * claiming `all`.
+         */
+        function exportFilename(rows, format, at, total) {
+            const pad = (value) => String(value).padStart(2, "0");
+            const when = new Date(at);
+            const stamp = `${String(when.getFullYear())}${pad(when.getMonth() + 1)}${pad(when.getDate())}-${pad(when.getHours())}${pad(when.getMinutes())}`;
+            const first = rows.length === 1 ? rows[0] : undefined;
+            const subset = total !== undefined && rows.length < total;
+            const scope = first !== undefined
+                ? first.provider
+                : subset ? `${String(rows.length)}providers` : "all";
+            return `model-config-${scope}-${stamp}.${format}`;
+        }
+        /** Hand one text export to the browser as a download. */
+        function downloadText(filename, text, mime) {
+            const blob = new Blob([text], { type: `${mime};charset=utf-8` });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download = filename;
+            anchor.rel = "noopener";
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 0);
+        }
+        /**
+         * Read the plaintext values behind the given credential references. Only the
+         * Host half can do this: the shipped credentials Remote describes a
+         * reference and never returns its value.
+         * @param refs - reference names to resolve.
+         * @returns per-reference values, plus which are unset or unnamed by the configuration.
+         */
+        async function fetchSecrets(refs) {
+            try {
+                const response = await fetch(location.origin + SECRETS_PATH, {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ refs })
+                });
+                if (response.status === 404)
+                    return { kind: "stale" };
+                let payload = null;
+                try {
+                    payload = await response.json();
+                }
+                catch {
+                    payload = null;
+                }
+                const body = isRecord(payload) ? payload : undefined;
+                if (!response.ok) {
+                    return { kind: "error", message: readProbeMessage(body) ?? `HTTP ${response.status}` };
+                }
+                const values = {};
+                const missing = [];
+                const rawValues = body?.values;
+                for (const ref of refs) {
+                    const entry = isRecord(rawValues) ? rawValues[ref] : undefined;
+                    if (typeof entry === "string" && entry.length > 0)
+                        values[ref] = entry;
+                    else
+                        missing.push(ref);
+                }
+                const rawRefused = body?.refused;
+                const refused = Array.isArray(rawRefused)
+                    ? rawRefused.filter((entry) => typeof entry === "string")
+                    : [];
+                return { kind: "ok", values, missing, refused };
+            }
+            catch (error) {
+                return { kind: "error", message: messageOf(error) };
+            }
+        }
+        /* ------------------------------------------------------------ import helpers */
+        /** The shape a credential reference name has to have to be storable. */
+        const KEY_REF_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+        /**
+         * Above this many characters the dialog stops parsing and asks for a file
+         * instead: the text is re-read on every keystroke, and a multi-megabyte
+         * paste would make the page stutter for no benefit.
+         */
+        const IMPORT_MAX_CHARS = 1_000_000;
+        /** The document an empty box stands for: nothing to read, nothing to report. */
+        function emptyImportDocument() {
+            return { format: "json", entries: [], keys: [], error: null };
+        }
+        /**
+         * Display copy for a document-level read failure. The parser reports a
+         * stable code for its own failures and a thrown message for `JSON.parse`,
+         * so anything unrecognized is shown verbatim rather than swallowed.
+         * @param code - the parser's code or a thrown message.
+         * @param t - the bound dictionary lookup.
+         * @returns the sentence to show.
+         */
+        function importErrorText(code, t) {
+            if (code === "empty")
+                return t("importErrEmpty");
+            if (code === "no-providers")
+                return t("importErrNoProviders");
+            if (code === "no-keys")
+                return t("importErrNoKeys");
+            if (code === "bad-shape")
+                return t("importErrShape");
+            if (code === "not-a-mapping")
+                return t("importErrMapping");
+            if (code === "too-large")
+                return t("importErrTooLarge");
+            if (code === "tab-indent" || code === "bad-indent" || code === "trailing"
+                || code === "unexpected-end" || code === "bad-key" || code === "bad-scalar") {
+                return t("importErrYaml");
+            }
+            return fill(t("importErrParse"), { message: code });
+        }
+        /**
+         * Read the YAML subset this plugin's own exporter emits: block mappings,
+         * block sequences, full-line comments, and JSON-quoted or bare scalars.
+         * Flow collections other than the empty `[]` / `{}` are reported as
+         * unsupported instead of guessed at, so a hand-edited document fails
+         * loudly rather than importing a half-read profile.
+         * @param text - the YAML text.
+         * @returns the parsed root value, or the reason it left the subset.
+         */
+        function parseYamlSubset(text) {
+            const lines = [];
+            for (const raw of text.split(/\r?\n/)) {
+                if (/^\s*$/.test(raw) || /^\s*#/.test(raw))
+                    continue;
+                const match = /^([ \t]*)([\s\S]*?)\s*$/.exec(raw);
+                if (match === null)
+                    continue;
+                const pad = match[1] ?? "";
+                if (pad.includes("\t"))
+                    return { value: undefined, error: "tab-indent" };
+                lines.push({ indent: pad.length, text: match[2] ?? "" });
+            }
+            if (lines.length === 0)
+                return { value: undefined, error: "empty" };
+            const state = { lines, index: 0 };
+            const parsed = parseYamlBlock(state, lines[0]?.indent ?? 0);
+            if (parsed.error !== null)
+                return parsed;
+            if (state.index !== lines.length)
+                return { value: undefined, error: "trailing" };
+            return parsed;
+        }
+        /** Parse one block: a sequence when the line starts with a dash, else a mapping. */
+        function parseYamlBlock(state, indent) {
+            const line = state.lines[state.index];
+            if (line === undefined)
+                return { value: undefined, error: "unexpected-end" };
+            if (line.indent !== indent)
+                return { value: undefined, error: "bad-indent" };
+            if (line.text === "-" || line.text.startsWith("- "))
+                return parseYamlSequence(state, indent);
+            return parseYamlMapping(state, indent);
+        }
+        /** Parse a `-` block at one indentation level. */
+        function parseYamlSequence(state, indent) {
+            const items = [];
+            for (;;) {
+                const line = state.lines[state.index];
+                if (line === undefined || line.indent !== indent)
+                    break;
+                if (line.text !== "-" && !line.text.startsWith("- "))
+                    break;
+                const inline = line.text === "-" ? "" : line.text.slice(2).trim();
+                state.index += 1;
+                if (inline.length === 0) {
+                    const next = state.lines[state.index];
+                    if (next === undefined || next.indent <= indent) {
+                        items.push(null);
+                        continue;
+                    }
+                    const nested = parseYamlBlock(state, next.indent);
+                    if (nested.error !== null)
+                        return nested;
+                    items.push(nested.value ?? null);
+                    continue;
+                }
+                /*
+                 * `- key: value` starts a mapping on the dash line. Expanding it into
+                 * a synthetic line one level in lets the one mapping parser handle
+                 * both the inline entry and any keys that follow it.
+                 */
+                if (splitYamlEntry(inline) !== null) {
+                    const childIndent = indent + 2;
+                    state.lines.splice(state.index, 0, { indent: childIndent, text: inline });
+                    const nested = parseYamlBlock(state, childIndent);
+                    if (nested.error !== null)
+                        return nested;
+                    items.push(nested.value ?? null);
+                    continue;
+                }
+                const scalar = parseYamlScalar(inline);
+                if (scalar.error !== null)
+                    return scalar;
+                items.push(scalar.value ?? null);
+            }
+            return { value: items, error: null };
+        }
+        /** Parse a `key: value` block at one indentation level. */
+        function parseYamlMapping(state, indent) {
+            const value = {};
+            for (;;) {
+                const line = state.lines[state.index];
+                if (line === undefined || line.indent !== indent)
+                    break;
+                if (line.text === "-" || line.text.startsWith("- "))
+                    break;
+                const split = splitYamlEntry(line.text);
+                if (split === null)
+                    return { value: undefined, error: "bad-key" };
+                state.index += 1;
+                if (split.rest.length === 0) {
+                    const next = state.lines[state.index];
+                    if (next === undefined || next.indent <= indent) {
+                        value[split.key] = null;
+                        continue;
+                    }
+                    const nested = parseYamlBlock(state, next.indent);
+                    if (nested.error !== null)
+                        return nested;
+                    value[split.key] = nested.value ?? null;
+                    continue;
+                }
+                const scalar = parseYamlScalar(split.rest);
+                if (scalar.error !== null)
+                    return scalar;
+                value[split.key] = scalar.value ?? null;
+            }
+            return { value, error: null };
+        }
+        /**
+         * Split `key: rest` at the key separator, unquoting a quoted key. The
+         * separator is the first `:` that ends the line or is followed by a space,
+         * so a plain key may itself contain `:` and spaces, exactly as YAML reads it.
+         */
+        function splitYamlEntry(text) {
+            if (text.startsWith("\"")) {
+                let end = -1;
+                for (let index = 1; index < text.length; index += 1) {
+                    const char = text[index];
+                    if (char === "\\") {
+                        index += 1;
+                        continue;
+                    }
+                    if (char === "\"") {
+                        end = index;
+                        break;
+                    }
+                }
+                if (end < 0)
+                    return null;
+                let key;
+                try {
+                    key = JSON.parse(text.slice(0, end + 1));
+                }
+                catch {
+                    return null;
+                }
+                if (typeof key !== "string")
+                    return null;
+                const after = text.slice(end + 1).trim();
+                if (after === ":")
+                    return { key, rest: "" };
+                if (after.startsWith(": "))
+                    return { key, rest: after.slice(2).trim() };
+                return null;
+            }
+            let at = -1;
+            for (let index = 0; index < text.length; index += 1) {
+                if (text[index] !== ":")
+                    continue;
+                const next = text[index + 1];
+                if (next === undefined || next === " ") {
+                    at = index;
+                    break;
+                }
+            }
+            if (at <= 0)
+                return null;
+            const key = text.slice(0, at).trim();
+            if (key.length === 0)
+                return null;
+            return { key, rest: text.slice(at + 1).trim() };
+        }
+        /** Read one scalar: the empty containers, JSON-quoted strings, or a bare token. */
+        function parseYamlScalar(text) {
+            if (text === "[]")
+                return { value: [], error: null };
+            if (text === "{}")
+                return { value: {}, error: null };
+            if (text === "null" || text === "~")
+                return { value: null, error: null };
+            if (text === "true")
+                return { value: true, error: null };
+            if (text === "false")
+                return { value: false, error: null };
+            if (text.startsWith("\"")) {
+                let parsed;
+                try {
+                    parsed = JSON.parse(text);
+                }
+                catch {
+                    return { value: undefined, error: "bad-scalar" };
+                }
+                if (typeof parsed !== "string")
+                    return { value: undefined, error: "bad-scalar" };
+                return { value: parsed, error: null };
+            }
+            /* An unquoted `a: b` would be a nested mapping, which this subset does not emit. */
+            if (text.includes(": ") || text.endsWith(":"))
+                return { value: undefined, error: "bad-scalar" };
+            if (/^[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?$/.test(text)) {
+                const number = Number(text);
+                if (Number.isFinite(number))
+                    return { value: number, error: null };
+            }
+            return { value: text, error: null };
+        }
+        /** The format a document is read as when the dialog is set to detect it. */
+        function sniffImportFormat(text) {
+            const first = text[0];
+            if (first === "{" || first === "[")
+                return "json";
+            for (const raw of text.split(/\r?\n/)) {
+                const line = raw.trim();
+                if (line.length === 0 || line.startsWith("#"))
+                    continue;
+                return /^[A-Za-z_][A-Za-z0-9_]*\s*=/.test(line) ? "env" : "yaml";
+            }
+            return "yaml";
+        }
+        /** Read the whole document in the chosen (or detected) format. */
+        function parseImportDocument(text, format) {
+            if (text.trim().length === 0)
+                return { format: "json", entries: [], keys: [], error: "empty" };
+            const chosen = format === "auto" ? sniffImportFormat(text) : format;
+            if (chosen === "env")
+                return parseEnvDocument(text);
+            if (chosen === "json")
+                return parseJsonDocument(text);
+            const parsed = parseYamlSubset(text);
+            if (parsed.error !== null)
+                return { format: "yaml", entries: [], keys: [], error: parsed.error };
+            return yamlDocumentOf(parsed.value);
+        }
+        /** Read a `.env` document: `REF=value` lines, comments ignored. */
+        function parseEnvDocument(text) {
+            const keys = [];
+            for (const raw of text.split(/\r?\n/)) {
+                const line = raw.trim();
+                if (line.length === 0 || line.startsWith("#"))
+                    continue;
+                const at = line.indexOf("=");
+                if (at <= 0)
+                    continue;
+                const ref = line.slice(0, at).trim();
+                const value = line.slice(at + 1).trim();
+                if (!KEY_REF_PATTERN.test(ref) || value.length === 0)
+                    continue;
+                keys.push({ ref, value });
+            }
+            return { format: "env", entries: [], keys, error: keys.length === 0 ? "no-keys" : null };
+        }
+        /** Read the JSON export shape: a document, an array of records, or one record. */
+        function parseJsonDocument(text) {
+            let parsed;
+            try {
+                parsed = JSON.parse(text);
+            }
+            catch (error) {
+                return { format: "json", entries: [], keys: [], error: messageOf(error) };
+            }
+            let records = null;
+            if (Array.isArray(parsed))
+                records = parsed;
+            else if (isRecord(parsed)) {
+                const list = parsed["providers"];
+                records = Array.isArray(list) ? list : [parsed];
+            }
+            if (records === null)
+                return { format: "json", entries: [], keys: [], error: "bad-shape" };
+            const entries = [];
+            for (const record of records) {
+                if (!isRecord(record))
+                    continue;
+                const entry = importEntryOfRecord(record);
+                if (entry !== null)
+                    entries.push(entry);
+            }
+            return { format: "json", entries, keys: [], error: entries.length === 0 ? "no-providers" : null };
+        }
+        /** One JSON export record as an import entry, tolerating a missing profile. */
+        function importEntryOfRecord(record) {
+            const provider = typeof record["provider"] === "string" && record["provider"].length > 0 ? record["provider"] : null;
+            const settingsNs = typeof record["settingsNs"] === "string" && record["settingsNs"].length > 0 ? record["settingsNs"] : null;
+            if (settingsNs === null)
+                return null;
+            const rawPath = record["settingsPath"];
+            const settingsPath = Array.isArray(rawPath)
+                ? rawPath.filter((part) => typeof part === "string")
+                : provider === null
+                    ? []
+                    : ["providers", provider];
+            const rawProfile = record["profile"];
+            let profile;
+            if (isRecord(rawProfile))
+                profile = (cloneJson(rawProfile) ?? {});
+            else {
+                /* An older or hand-written record: rebuild the profile from its summary fields. */
+                const rebuilt = {};
+                for (const key of ["api", "baseURL", "displayName", "apiKeyEnv"]) {
+                    const value = record[key];
+                    if (typeof value === "string" && value.length > 0)
+                        rebuilt[key] = value;
+                }
+                if (Array.isArray(record["models"]))
+                    rebuilt["models"] = cloneJson(record["models"]) ?? [];
+                if (Object.keys(rebuilt).length === 0)
+                    return null;
+                profile = rebuilt;
+            }
+            const declared = profile["apiKeyEnv"];
+            const apiKeyEnv = typeof record["apiKeyEnv"] === "string" && record["apiKeyEnv"].length > 0
+                ? record["apiKeyEnv"]
+                : typeof declared === "string" && declared.length > 0
+                    ? declared
+                    : null;
+            const apiKey = typeof record["apiKey"] === "string" && record["apiKey"].length > 0 ? record["apiKey"] : null;
+            return { provider, settingsNs, settingsPath, profile, apiKeyEnv, apiKey };
+        }
+        /** Read a YAML configuration snippet: namespace → providers → route → profile. */
+        function yamlDocumentOf(value) {
+            if (!isJsonObject(value))
+                return { format: "yaml", entries: [], keys: [], error: "not-a-mapping" };
+            const entries = [];
+            for (const [ns, section] of Object.entries(value)) {
+                if (!isJsonObject(section))
+                    continue;
+                const providers = section["providers"];
+                if (isJsonObject(providers)) {
+                    for (const [route, profile] of Object.entries(providers)) {
+                        if (!isJsonObject(profile))
+                            continue;
+                        entries.push(importEntryOfProfile(ns, ["providers", route], route, profile));
+                    }
+                    continue;
+                }
+                /* No providers map: the whole section is one provider's profile. */
+                entries.push(importEntryOfProfile(ns, [], null, section));
+            }
+            return { format: "yaml", entries, keys: [], error: entries.length === 0 ? "no-providers" : null };
+        }
+        /** One profile at a known path, as an import entry. */
+        function importEntryOfProfile(ns, path, provider, profile) {
+            const copy = cloneJson(profile);
+            const body = isJsonObject(copy) ? copy : {};
+            const declared = body["apiKeyEnv"];
+            return {
+                provider,
+                settingsNs: ns,
+                settingsPath: [...path],
+                profile: body,
+                apiKeyEnv: typeof declared === "string" && declared.length > 0 ? declared : null,
+                apiKey: null
+            };
+        }
+        /** The route a namespace's root profile belongs to, from the live configuration. */
+        function rowRouteFor(rows, ns) {
+            for (const row of rows) {
+                if (row.settingsNs === ns && row.settingsPath.length === 0)
+                    return row.provider;
+            }
+            return null;
+        }
+        /**
+         * Match a parsed document against the live configuration: resolve the route
+         * a section-level profile belongs to, drop the impossible entries with a
+         * reason, and mark the ones that would replace something that exists.
+         * Duplicate targets collapse to the last entry, which is the one the write
+         * order would leave in place.
+         * @param document - the parsed document.
+         * @param context - the live rows and a namespace-section lookup.
+         * @returns one candidate per target, in document order.
+         */
+        function planImport(document, context) {
+            const planned = new Map();
+            for (const entry of document.entries) {
+                const provider = entry.provider ?? rowRouteFor(context.rows, entry.settingsNs);
+                const section = context.sectionOf(entry.settingsNs);
+                const models = entry.profile["models"];
+                const problem = provider === null
+                    ? { code: "unknownProvider" }
+                    : !ROUTE_PATTERN.test(provider)
+                        ? { code: "badRoute", route: provider }
+                        : section === undefined
+                            ? { code: "noNamespace", ns: entry.settingsNs }
+                            : Array.isArray(models) && models.length === 0
+                                ? { code: "noModels" }
+                                : null;
+                const existing = getPath(section, entry.settingsPath);
+                const overwrite = entry.settingsPath.length === 0
+                    ? isJsonObject(section) && Object.keys(section).length > 0
+                    : existing !== undefined;
+                const declared = entry.profile["displayName"];
+                const displayName = typeof declared === "string" && declared.length > 0
+                    ? declared
+                    : provider ?? entry.settingsNs;
+                planned.set(`${entry.settingsNs}\u0000${entry.settingsPath.join("\u0000")}`, {
+                    ...entry,
+                    provider,
+                    displayName,
+                    modelCount: Array.isArray(models) ? models.length : 0,
+                    overwrite,
+                    problem
+                });
+            }
+            return Array.from(planned.values());
+        }
+        /**
+         * The credential writes an import performs: keys carried by the document's
+         * own records first, then any `.env` lines, which win because they are the
+         * document's explicit statement about that reference.
+         */
+        function importKeyWrites(document, candidates) {
+            const writes = [];
+            const push = (ref, value) => {
+                if (!KEY_REF_PATTERN.test(ref) || value.length === 0)
+                    return;
+                const at = writes.findIndex((entry) => entry.ref === ref);
+                if (at >= 0)
+                    writes[at] = { ref, value };
+                else
+                    writes.push({ ref, value });
+            };
+            for (const candidate of candidates) {
+                if (candidate.problem !== null || candidate.apiKey === null)
+                    continue;
+                const ref = candidate.apiKeyEnv
+                    ?? (candidate.provider === null ? null : deriveKeyRef(candidate.provider));
+                if (ref !== null)
+                    push(ref, candidate.apiKey);
+            }
+            for (const entry of document.keys)
+                push(entry.ref, entry.value);
+            return writes;
+        }
+        /** How many candidates an import would add, replace, or has to skip. */
+        function importSummary(candidates) {
+            let add = 0;
+            let replace = 0;
+            let blocked = 0;
+            let models = 0;
+            for (const candidate of candidates) {
+                if (candidate.problem !== null) {
+                    blocked += 1;
+                    continue;
+                }
+                if (candidate.overwrite)
+                    replace += 1;
+                else
+                    add += 1;
+                models += candidate.modelCount;
+            }
+            return { add, replace, blocked, models };
+        }
         return {
             inject: ["slots", "locale", "remote", "remote.llm", "remote.settings", "remote.credentials"],
             apply(ctx) {
@@ -707,6 +1702,26 @@ select.mcf-input{appearance:auto;height:34px}
                     const [flash, setFlash] = React.useState(null);
                     const [pulseTick, setPulseTick] = React.useState(0);
                     const [pulse, setPulse] = React.useState(false);
+                    const [exporting, setExporting] = React.useState(null);
+                    const [exportPicked, setExportPicked] = React.useState(new Set());
+                    const [exportFormat, setExportFormat] = React.useState("json");
+                    const [includeKey, setIncludeKey] = React.useState(true);
+                    const [exportCopy, setExportCopy] = React.useState("idle");
+                    const [secrets, setSecrets] = React.useState({
+                        status: "idle",
+                        values: {},
+                        missing: [],
+                        refused: [],
+                        error: null
+                    });
+                    const exportTextRef = React.useRef(null);
+                    const [importing, setImporting] = React.useState(false);
+                    const [importText, setImportText] = React.useState("");
+                    const [importFormat, setImportFormat] = React.useState("auto");
+                    const [importIncludeKeys, setImportIncludeKeys] = React.useState(true);
+                    const [importBusy, setImportBusy] = React.useState(false);
+                    const [importError, setImportError] = React.useState(null);
+                    const importFileRef = React.useRef(null);
                     /* The creation-success note clears itself; no timer to manage by hand. */
                     React.useEffect(() => {
                         if (flash === null)
@@ -894,6 +1909,215 @@ select.mcf-input{appearance:auto;height:34px}
                         setAdding(null);
                         setAddError(null);
                         setModalTest(null);
+                    };
+                    /**
+                     * Resolve the credential references the rows declare, through the
+                     * Host half. Changing the provider selection fires another lookup, so
+                     * a sequence number keeps a slow earlier answer from overwriting the
+                     * values of the selection the user actually has now.
+                     */
+                    const exportSecretSeq = React.useRef(0);
+                    const loadExportSecrets = async (rows) => {
+                        const seq = exportSecretSeq.current + 1;
+                        exportSecretSeq.current = seq;
+                        const refs = keyRefsOf(rows);
+                        if (refs.length === 0) {
+                            setSecrets({ status: "ready", values: {}, missing: [], refused: [], error: null });
+                            return;
+                        }
+                        setSecrets({ status: "loading", values: {}, missing: [], refused: [], error: null });
+                        const answer = await fetchSecrets(refs);
+                        if (exportSecretSeq.current !== seq)
+                            return;
+                        if (answer.kind === "stale") {
+                            setSecrets({ status: "error", values: {}, missing: [], refused: [], error: t("exportHostStale") });
+                            return;
+                        }
+                        if (answer.kind === "error") {
+                            setSecrets({
+                                status: "error",
+                                values: {},
+                                missing: [],
+                                refused: [],
+                                error: fill(t("exportKeyFailed"), { message: answer.message })
+                            });
+                            return;
+                        }
+                        setSecrets({
+                            status: "ready",
+                            values: answer.values,
+                            missing: answer.missing,
+                            refused: answer.refused,
+                            error: null
+                        });
+                    };
+                    /**
+                     * Open the export dialog. The whole list is the pool (so the selection
+                     * can be widened), while `picked` seeds what is ticked: one provider
+                     * from a card's own button, everything from the toolbar.
+                     */
+                    const startExport = (rows, picked) => {
+                        if (rows.length === 0)
+                            return;
+                        const wanted = new Set(picked ?? rows.map((row) => row.provider));
+                        const chosen = rows.filter((row) => wanted.has(row.provider));
+                        const selected = chosen.length > 0 ? chosen : [...rows];
+                        setExporting({ rows: [...rows], at: new Date().toISOString() });
+                        setExportPicked(new Set(selected.map((row) => row.provider)));
+                        setExportFormat("json");
+                        setIncludeKey(true);
+                        setExportCopy("idle");
+                        setSecrets({ status: "idle", values: {}, missing: [], refused: [], error: null });
+                        void loadExportSecrets(selected);
+                    };
+                    /** Close the export dialog and drop its transient lookup state. */
+                    const closeExport = () => {
+                        exportSecretSeq.current += 1;
+                        setExporting(null);
+                        setExportPicked(new Set());
+                        setExportCopy("idle");
+                        setSecrets({ status: "idle", values: {}, missing: [], refused: [], error: null });
+                    };
+                    /**
+                     * Copy the rendered export. The async clipboard is preferred; a
+                     * selection of the read-only preview is the fallback for the
+                     * contexts where the API is unavailable or refused.
+                     */
+                    const copyExport = async (text) => {
+                        try {
+                            if (typeof navigator !== "undefined" && navigator.clipboard !== undefined) {
+                                await navigator.clipboard.writeText(text);
+                                setExportCopy("ok");
+                                return;
+                            }
+                        }
+                        catch {
+                            /* fall through to the selection fallback */
+                        }
+                        const node = exportTextRef.current;
+                        if (node === null) {
+                            setExportCopy("fail");
+                            return;
+                        }
+                        node.focus();
+                        node.select();
+                        let copied = false;
+                        try {
+                            copied = typeof document.execCommand === "function" && document.execCommand("copy");
+                        }
+                        catch {
+                            copied = false;
+                        }
+                        setExportCopy(copied ? "ok" : "fail");
+                    };
+                    /** Open the import dialog, empty. */
+                    const startImport = () => {
+                        setImporting(true);
+                        setImportText("");
+                        setImportFormat("auto");
+                        setImportIncludeKeys(true);
+                        setImportBusy(false);
+                        setImportError(null);
+                    };
+                    /** Close the import dialog and drop its transient state. */
+                    const closeImport = () => {
+                        setImporting(false);
+                        setImportBusy(false);
+                        setImportError(null);
+                    };
+                    /** Read one picked file into the paste box. */
+                    const pickImportFile = async (file) => {
+                        if (file === undefined)
+                            return;
+                        try {
+                            setImportText(await file.text());
+                            setImportError(null);
+                        }
+                        catch (error) {
+                            setImportError(fill(t("importReadFailed"), { message: messageOf(error) }));
+                        }
+                    };
+                    /**
+                     * Write the planned providers and then the keys the document
+                     * carried. Providers are grouped per namespace so each namespace is
+                     * one revision-checked write; a namespace that refuses is reported
+                     * and the others still go through. The dialog stays open while
+                     * anything failed, so the reasons are readable.
+                     * @param candidates - the planned entries.
+                     * @param keys - credential writes to perform after the profiles land.
+                     */
+                    const applyImport = async (candidates, keys) => {
+                        const ready = candidates.filter((candidate) => candidate.problem === null);
+                        if (ready.length === 0 && keys.length === 0)
+                            return;
+                        setImportBusy(true);
+                        setImportError(null);
+                        try {
+                            const byNamespace = new Map();
+                            for (const candidate of ready) {
+                                const list = byNamespace.get(candidate.settingsNs);
+                                if (list === undefined)
+                                    byNamespace.set(candidate.settingsNs, [candidate]);
+                                else
+                                    list.push(candidate);
+                            }
+                            let written = 0;
+                            const failures = [];
+                            for (const [ns, list] of byNamespace) {
+                                const namespace = state.namespaces.get(ns);
+                                if (namespace === undefined) {
+                                    failures.push(fill(t("importNsFailed"), { ns, message: t("noNamespace") }));
+                                    continue;
+                                }
+                                const ops = list.map((candidate) => ({
+                                    op: "set",
+                                    path: [...candidate.settingsPath],
+                                    value: candidate.profile
+                                }));
+                                let response;
+                                try {
+                                    response = await ctx.remote.settings.mutate(ns, ops, namespace.revision);
+                                }
+                                catch (error) {
+                                    failures.push(fill(t("importNsFailed"), { ns, message: messageOf(error) }));
+                                    continue;
+                                }
+                                if (!response.ok) {
+                                    const message = response.error.code === "settings/conflict"
+                                        ? t("conflict")
+                                        : response.error.message;
+                                    failures.push(fill(t("importNsFailed"), { ns, message }));
+                                    continue;
+                                }
+                                written += list.length;
+                            }
+                            let stored = 0;
+                            if (importIncludeKeys && ctx.remote.credentials !== undefined) {
+                                for (const entry of keys) {
+                                    try {
+                                        const answer = await ctx.remote.credentials.set(entry.ref, entry.value);
+                                        if (answer.ok)
+                                            stored += 1;
+                                        else
+                                            failures.push(fill(t("importKeyFailed"), { ref: entry.ref, message: answer.error.message }));
+                                    }
+                                    catch (error) {
+                                        failures.push(fill(t("importKeyFailed"), { ref: entry.ref, message: messageOf(error) }));
+                                    }
+                                }
+                            }
+                            await load();
+                            if (failures.length === 0) {
+                                setImporting(false);
+                                setImportError(null);
+                                setFlash(fill(t("importedFlash"), { count: String(written), keys: String(stored) }));
+                                return;
+                            }
+                            setImportError(failures.join("\n"));
+                        }
+                        finally {
+                            setImportBusy(false);
+                        }
                     };
                     /**
                      * Open the new-provider dialog over the first namespace whose schema
@@ -1314,7 +2538,12 @@ select.mcf-input{appearance:auto;height:34px}
                     const renderPanel = (row, panelId) => {
                         const editable = row.editable && state.writable;
                         const providerName = row.displayName.length === 0 ? row.provider : row.displayName;
-                        return h("div", { className: "mcf-panel", id: panelId }, h("div", { className: "mcf-panelHead" }, h("span", { className: "mcf-panelTitle" }, t("models")), h("div", { className: "mcf-panelActions" }, editable && canRemoveProvider(row) ? h("button", {
+                        return h("div", { className: "mcf-panel", id: panelId }, h("div", { className: "mcf-panelHead" }, h("span", { className: "mcf-panelTitle" }, t("models")), h("div", { className: "mcf-panelActions" }, h("button", {
+                            type: "button",
+                            className: "mcf-btn mcf-btnSm",
+                            "aria-label": `${t("exportLabel")} ${providerName}`,
+                            onClick: () => startExport(state.rows, [row.provider])
+                        }, t("exportLabel")), editable && canRemoveProvider(row) ? h("button", {
                             type: "button",
                             className: "mcf-btn mcf-btnSm mcf-iconBtn mcf-iconDanger",
                             disabled: busy[row.provider] === true,
@@ -1367,6 +2596,270 @@ select.mcf-input{appearance:auto;height:34px}
                     */
                     const renderDialog = () => {
                         const providerNameOf = (row) => row.displayName.length === 0 ? row.provider : row.displayName;
+                        if (importing) {
+                            const document = importText.trim().length === 0
+                                ? emptyImportDocument()
+                                : importText.length > IMPORT_MAX_CHARS
+                                    ? { format: "json", entries: [], keys: [], error: "too-large" }
+                                    : parseImportDocument(importText, importFormat);
+                            const candidates = planImport(document, {
+                                rows: state.rows,
+                                sectionOf: (ns) => {
+                                    const namespace = state.namespaces.get(ns);
+                                    return namespace === undefined ? undefined : namespace.value ?? {};
+                                }
+                            });
+                            const summary = importSummary(candidates);
+                            const keys = importIncludeKeys ? importKeyWrites(document, candidates) : [];
+                            const ready = summary.add + summary.replace;
+                            const problemText = (problem) => {
+                                if (problem.code === "unknownProvider")
+                                    return t("importUnknownProvider");
+                                if (problem.code === "badRoute")
+                                    return fill(t("importBadRoute"), { route: problem.route });
+                                if (problem.code === "noNamespace")
+                                    return fill(t("importNoNamespace"), { ns: problem.ns });
+                                return t("importNoModels");
+                            };
+                            return h("div", {
+                                className: "mcf-overlay",
+                                onClick: (event) => {
+                                    if (event.target === event.currentTarget && !importBusy)
+                                        closeImport();
+                                }
+                            }, h("div", {
+                                className: "mcf-modal mcf-modalFixed mcf-modalWide",
+                                role: "dialog",
+                                "aria-modal": "true",
+                                "aria-labelledby": "mcf-import-title"
+                            }, h("div", { className: "mcf-modalHead" }, h("div", null, h("h2", { className: "mcf-modalTitle", id: "mcf-import-title" }, t("importTitle")), h("p", { className: "mcf-modalSub" }, t("importSub"))), h("button", {
+                                type: "button",
+                                className: "mcf-btn mcf-btnSm mcf-iconBtn",
+                                "aria-label": t("close"),
+                                title: t("close"),
+                                disabled: importBusy,
+                                onClick: closeImport
+                            }, h(CloseIcon, {}))), h("div", { className: "mcf-modalBody" }, h("div", { className: "mcf-exportOpts" }, h("label", { className: "mcf-field" }, h("span", null, t("importFormat")), h("select", {
+                                className: "mcf-input mcf-exportSelect",
+                                value: importFormat,
+                                "aria-label": t("importFormat"),
+                                onChange: (event) => {
+                                    const next = event.target.value;
+                                    setImportFormat(next === "json" ? "json" : next === "yaml" ? "yaml" : next === "env" ? "env" : "auto");
+                                }
+                            }, h("option", { value: "auto" }, t("importFormatAuto")), h("option", { value: "json" }, t("importFormatJson")), h("option", { value: "yaml" }, t("importFormatYaml")), h("option", { value: "env" }, t("importFormatEnv")))), h("button", {
+                                type: "button",
+                                className: "mcf-btn mcf-btnSm",
+                                onClick: () => importFileRef.current?.click()
+                            }, t("importPickFile")), h("input", {
+                                ref: importFileRef,
+                                className: "mcf-importFile",
+                                type: "file",
+                                accept: ".json,.yaml,.yml,.env,.txt,application/json,text/plain",
+                                "aria-label": t("importPickFile"),
+                                onChange: (event) => {
+                                    const file = event.target.files?.[0];
+                                    event.target.value = "";
+                                    void pickImportFile(file);
+                                }
+                            })), h("textarea", {
+                                className: "mcf-exportText",
+                                value: importText,
+                                placeholder: t("importPlaceholder"),
+                                "aria-label": t("importTitle"),
+                                spellCheck: false,
+                                onChange: (event) => {
+                                    setImportText(event.target.value);
+                                    setImportError(null);
+                                }
+                            }), !state.writable ? h("p", { className: "mcf-exportWarn" }, t("importReadOnly")) : null, document.error === null ? null
+                                : h("p", { className: "mcf-exportWarn", role: "status" }, importErrorText(document.error, t)), document.error === null && candidates.length > 0
+                                ? h("p", { className: "mcf-importReason" }, fill(t("importScope"), {
+                                    add: String(summary.add),
+                                    replace: String(summary.replace),
+                                    skipped: String(summary.blocked),
+                                    models: String(summary.models)
+                                }))
+                                : null, candidates.length === 0 ? null : h("ul", { className: "mcf-importList" }, candidates.map((candidate, index) => h("li", {
+                                className: "mcf-importItem",
+                                key: `${candidate.settingsNs}/${candidate.settingsPath.join("/")}/${String(index)}`
+                            }, h("span", { className: "mcf-importName" }, candidate.displayName), h("span", { className: "mcf-importMeta", title: candidate.settingsNs }, candidate.problem === null
+                                ? `${candidate.provider ?? "?"} · ${candidate.settingsNs} · ${String(candidate.modelCount)}`
+                                : problemText(candidate.problem)), h("span", {
+                                className: candidate.problem !== null
+                                    ? "mcf-importBadge mcf-importBadgeSkip"
+                                    : candidate.overwrite
+                                        ? "mcf-importBadge mcf-importBadgeReplace"
+                                        : "mcf-importBadge mcf-importBadgeNew"
+                            }, candidate.problem !== null ? t("importSkip") : candidate.overwrite ? t("importReplace") : t("importNew"))))), summary.replace > 0
+                                ? h("p", { className: "mcf-exportNote" }, t("importReplaceWarn"))
+                                : null, document.error !== null ? null
+                                : document.keys.length === 0 && !document.entries.some((entry) => entry.apiKey !== null)
+                                    ? h("p", { className: "mcf-exportNote" }, t("importKeysNone"))
+                                    : h("div", null, h("label", { className: "mcf-skipRow" }, h("input", {
+                                        className: "mcf-check",
+                                        type: "checkbox",
+                                        checked: importIncludeKeys,
+                                        onChange: (event) => {
+                                            setImportIncludeKeys(event.target.checked);
+                                        }
+                                    }), t("importIncludeKeys")), importIncludeKeys
+                                        ? h("p", { className: "mcf-exportNote" }, fill(t("importKeysLine"), { count: String(keys.length) }))
+                                        : null), importError === null ? null : h("p", {
+                                className: "mcf-importError",
+                                role: "alert"
+                            }, importError)), h("div", { className: "mcf-modalFoot" }, h("button", {
+                                type: "button",
+                                className: "mcf-btn",
+                                disabled: importBusy,
+                                onClick: closeImport
+                            }, t("close")), h("button", {
+                                type: "button",
+                                className: "mcf-btn mcf-btnPrimary",
+                                disabled: importBusy || ready === 0 || !state.writable,
+                                onClick: () => {
+                                    void applyImport(candidates, keys);
+                                }
+                            }, importBusy ? t("importBusy") : fill(t("importApply"), { count: String(ready) })))));
+                        }
+                        if (exporting !== null) {
+                            const target = exporting;
+                            const rows = target.rows;
+                            const pickedRows = rows.filter((row) => exportPicked.has(row.provider));
+                            const single = pickedRows.length === 1 ? pickedRows[0] : undefined;
+                            const title = single !== undefined
+                                ? fill(t("exportTitleOne"), { provider: providerNameOf(single) })
+                                : pickedRows.length === rows.length
+                                    ? t("exportTitleAll")
+                                    : fill(t("exportTitlePicked"), { count: String(pickedRows.length) });
+                            const modelTotal = pickedRows.reduce((total, row) => total + row.models.length, 0);
+                            const refs = keyRefsOf(pickedRows);
+                            const text = renderExport(exportFormat, pickedRows, secrets.values, includeKey, target.at);
+                            /** Tick a provider on or off and refresh the keys the selection declares. */
+                            const applyPick = (next) => {
+                                setExportPicked(next);
+                                setExportCopy("idle");
+                                const chosen = rows.filter((row) => next.has(row.provider));
+                                if (includeKey)
+                                    void loadExportSecrets(chosen);
+                            };
+                            const notes = [];
+                            if (pickedRows.length > 0 && refs.length === 0) {
+                                notes.push(h("p", { className: "mcf-exportNote", key: "none" }, t("exportRefsNone")));
+                            }
+                            if (includeKey && secrets.status === "loading") {
+                                notes.push(h("p", { className: "mcf-exportNote", key: "loading" }, t("exportKeyLoading")));
+                            }
+                            if (includeKey && secrets.error !== null) {
+                                notes.push(h("p", { className: "mcf-exportWarn", key: "error" }, secrets.error));
+                            }
+                            if (includeKey && secrets.missing.length > 0) {
+                                notes.push(h("p", { className: "mcf-exportNote", key: "missing" }, fill(t("exportKeyMissing"), { refs: secrets.missing.join(", ") })));
+                            }
+                            if (includeKey && secrets.refused.length > 0) {
+                                notes.push(h("p", { className: "mcf-exportNote", key: "refused" }, fill(t("exportKeyRefused"), { refs: secrets.refused.join(", ") })));
+                            }
+                            if (!includeKey) {
+                                notes.push(h("p", { className: "mcf-exportNote", key: "off" }, t("exportKeyOff")));
+                            }
+                            const keyIncluded = includeKey && secrets.status === "ready" && Object.keys(secrets.values).length > 0;
+                            return h("div", {
+                                className: "mcf-overlay",
+                                onClick: (event) => {
+                                    if (event.target === event.currentTarget)
+                                        closeExport();
+                                }
+                            }, h("div", {
+                                className: "mcf-modal mcf-modalFixed mcf-modalWide",
+                                role: "dialog",
+                                "aria-modal": "true",
+                                "aria-labelledby": "mcf-export-title"
+                            }, h("div", { className: "mcf-modalHead" }, h("div", null, h("h2", { className: "mcf-modalTitle", id: "mcf-export-title" }, title), h("p", { className: "mcf-modalSub" }, `${fill(t("exportScope"), { count: String(pickedRows.length), models: String(modelTotal) })} · ${t("exportSub")}`)), h("button", {
+                                type: "button",
+                                className: "mcf-btn mcf-btnSm mcf-iconBtn",
+                                "aria-label": t("close"),
+                                title: t("close"),
+                                onClick: closeExport
+                            }, h(CloseIcon, {}))), h("div", { className: "mcf-modalBody" }, h("div", { className: "mcf-exportOpts" }, h("label", { className: "mcf-field" }, h("span", null, t("exportFormat")), h("select", {
+                                className: "mcf-input mcf-exportSelect",
+                                value: exportFormat,
+                                "aria-label": t("exportFormat"),
+                                onChange: (event) => {
+                                    const next = event.target.value;
+                                    setExportFormat(next === "yaml" ? "yaml" : next === "env" ? "env" : "json");
+                                    setExportCopy("idle");
+                                }
+                            }, h("option", { value: "json" }, t("exportFormatJson")), h("option", { value: "yaml" }, t("exportFormatYaml")), h("option", { value: "env", disabled: !includeKey }, t("exportFormatEnv")))), h("label", { className: "mcf-rowCheck" }, h("input", {
+                                className: "mcf-check",
+                                type: "checkbox",
+                                checked: includeKey,
+                                onChange: (event) => {
+                                    const next = event.target.checked;
+                                    setIncludeKey(next);
+                                    setExportCopy("idle");
+                                    if (!next && exportFormat === "env")
+                                        setExportFormat("yaml");
+                                    if (next && refs.length > 0 && secrets.status !== "loading") {
+                                        void loadExportSecrets(pickedRows);
+                                    }
+                                }
+                            }), t("exportIncludeKey"))), h("div", {
+                                className: "mcf-candidates",
+                                role: "group",
+                                "aria-label": t("exportPick")
+                            }, h("div", { className: "mcf-candHead" }, h("span", { className: "mcf-candName" }, fill(t("exportPickCount"), { picked: String(pickedRows.length), total: String(rows.length) })), h("div", { className: "mcf-candActions" }, h("button", {
+                                type: "button",
+                                className: "mcf-btn mcf-btnSm",
+                                onClick: () => applyPick(new Set(rows.map((row) => row.provider)))
+                            }, t("exportPickAll")), h("button", {
+                                type: "button",
+                                className: "mcf-btn mcf-btnSm",
+                                disabled: pickedRows.length === 0,
+                                onClick: () => applyPick(new Set())
+                            }, t("exportPickNone")))), h("div", { className: "mcf-pickList" }, rows.map((row) => h("label", { className: "mcf-candRow", key: row.provider }, h("input", {
+                                className: "mcf-check",
+                                type: "checkbox",
+                                checked: exportPicked.has(row.provider),
+                                onChange: (event) => {
+                                    const next = new Set(exportPicked);
+                                    if (event.target.checked)
+                                        next.add(row.provider);
+                                    else
+                                        next.delete(row.provider);
+                                    applyPick(next);
+                                }
+                            }), h("span", { className: "mcf-pickName" }, providerNameOf(row)), h("span", { className: "mcf-candId" }, row.provider), h("span", { className: "mcf-candName" }, fill(t("exportPickModels"), { count: String(row.models.length) })))))), pickedRows.length === 0
+                                ? h("p", { className: "mcf-exportWarn" }, t("exportPickEmpty"))
+                                : null, ...notes, keyIncluded ? h("p", { className: "mcf-exportWarn" }, t("exportWarning")) : null, h("textarea", {
+                                className: "mcf-exportText",
+                                ref: exportTextRef,
+                                readOnly: true,
+                                spellCheck: false,
+                                value: text,
+                                "aria-label": title,
+                                onFocus: (event) => event.currentTarget.select()
+                            })), h("div", { className: "mcf-modalFoot" }, exportCopy === "ok"
+                                ? h("span", { className: "mcf-copied", role: "status" }, t("exportCopied"))
+                                : exportCopy === "fail"
+                                    ? h("span", { className: "mcf-exportWarn", role: "status" }, t("exportCopyFailed"))
+                                    : null, h("button", {
+                                type: "button",
+                                className: "mcf-btn",
+                                disabled: pickedRows.length === 0,
+                                onClick: () => void copyExport(text)
+                            }, t("exportCopy")), h("button", {
+                                type: "button",
+                                className: "mcf-btn mcf-btnPrimary",
+                                disabled: pickedRows.length === 0,
+                                onClick: () => {
+                                    downloadText(exportFilename(pickedRows, exportFormat, target.at, rows.length), text, exportMime(exportFormat));
+                                }
+                            }, t("exportSave")), h("button", {
+                                type: "button",
+                                className: "mcf-btn",
+                                onClick: closeExport
+                            }, t("close")))));
+                        }
                         if (confirming !== null) {
                             const target = confirming;
                             const row = state.rows.find((candidate) => candidate.provider === target.provider);
@@ -1697,7 +3190,7 @@ select.mcf-input{appearance:auto;height:34px}
                     };
                     /* Escape closes whichever overlay is open, wherever focus happens to be. */
                     React.useEffect(() => {
-                        if (adding === null && confirming === null && creating === null)
+                        if (adding === null && confirming === null && creating === null && exporting === null)
                             return;
                         const onKey = (event) => {
                             if (event.key !== "Escape")
@@ -1716,16 +3209,29 @@ select.mcf-input{appearance:auto;height:34px}
                             setCandidates(null);
                             setPicked(new Set());
                             setCandidateQuery("");
+                            setExporting(null);
+                            setExportPicked(new Set());
+                            setExportCopy("idle");
+                            setImporting(false);
+                            setImportError(null);
                         };
                         document.addEventListener("keydown", onKey);
                         return () => document.removeEventListener("keydown", onKey);
-                    }, [adding, confirming, creating]);
+                    }, [adding, confirming, creating, exporting, importing]);
                     const loading = state.status === "loading" && state.rows.length === 0;
                     const failed = state.status === "error";
                     const renderSlot = props.renderSlot;
                     /* A provider can only be hand-declared where a `providers` map exists. */
                     const creatableView = state.writable && [...state.namespaces.values()].some((namespace) => isRecord(getPath(namespace.value, ["providers"])) || isRecord(getPath(namespace.base, ["providers"])));
-                    return h("section", { className: "mcf-page", "aria-busy": loading }, h("style", null, MCF_CSS), h("header", { className: "mcf-pageHead", "data-window-drag": true }, h("div", null, h("h1", { className: "mcf-pageTitle" }, t("title")), h("p", { className: "mcf-pageIntro" }, t("intro"))), h("div", { className: "mcf-toolbar" }, typeof renderSlot === "function" ? renderSlot("model-config.action", {}) : null, creatableView ? h("button", {
+                    return h("section", { className: "mcf-page", "aria-busy": loading }, h("style", null, MCF_CSS), h("header", { className: "mcf-pageHead", "data-window-drag": true }, h("div", null, h("h1", { className: "mcf-pageTitle" }, t("title")), h("p", { className: "mcf-pageIntro" }, t("intro"))), h("div", { className: "mcf-toolbar" }, typeof renderSlot === "function" ? renderSlot("model-config.action", {}) : null, state.rows.length === 0 ? null : h("button", {
+                        type: "button",
+                        className: "mcf-btn mcf-btnSm",
+                        onClick: () => startExport(state.rows)
+                    }, t("exportAll")), state.writable && state.status === "ready" ? h("button", {
+                        type: "button",
+                        className: "mcf-btn mcf-btnSm",
+                        onClick: startImport
+                    }, t("importLabel")) : null, creatableView ? h("button", {
                         type: "button",
                         className: "mcf-btn mcf-btnSm mcf-btnPrimary",
                         onClick: startCreate

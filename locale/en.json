@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Model configuration",
-    "description": "Adds a sidebar Model configuration page: provider accordion, manual model add with a connectivity test, and a per-model vision switch."
+    "description": "Adds a sidebar Model configuration page: provider accordion, manual model add with a connectivity test, a per-model vision switch, a per-provider export (nickname, base URL, key, models), and an import for the exported JSON/YAML/.env."
   }
 }
