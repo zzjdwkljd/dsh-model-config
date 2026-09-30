@@ -1228,8 +1228,8 @@ body[data-ds-dark-theme] .mcf-page{--mcf-accent:#635BFF;--mcf-accent-hover:#574F
 .mcf-page[data-view="main"] .mcf-modelRow{grid-template-columns:minmax(0,1fr) 36px auto 27px}
 .mcf-page[data-view="main"] .mcf-modelRow>.mcf-switch{grid-column:2;grid-row:1}
 .mcf-page[data-view="main"] .mcf-modelRow>.mcf-rowActions{grid-column:3;grid-row:1;justify-self:end;display:flex;align-items:center;gap:6px}
-.mcf-page[data-view="main"] .mcf-modelRow>.mcf-modelMeta:nth-child(3){grid-column:2/4;grid-row:2;justify-self:start}
-.mcf-page[data-view="main"] .mcf-modelRow>.mcf-iconBtn{grid-column:4;grid-row:1/3}
+.mcf-page[data-view="main"] .mcf-modelRow>.mcf-modelMeta:nth-child(2){grid-column:1;grid-row:2;justify-self:start;max-width:max-content}
+.mcf-page[data-view="main"] .mcf-modelRow>.mcf-iconBtn{grid-column:4;grid-row:1/3;justify-self:end}
 `;
 
 		/** Render a translate result with `{name}` placeholders filled in. */
