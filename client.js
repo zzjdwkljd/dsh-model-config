@@ -476,6 +476,9 @@ select.mcf-input{appearance:auto;height:34px}
 .mcf-exportSelect{width:280px}
 .mcf-exportText{box-sizing:border-box;width:100%;min-height:200px;max-height:360px;resize:vertical;margin:0;padding:10px 12px;border:1px solid var(--mcf-border);border-radius:9px;background:var(--mcf-neutral);color:var(--mcf-text);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:18px;white-space:pre;overflow:auto}
 .mcf-exportText:focus{outline:none;border-color:var(--mcf-accent)}
+/* Inside a fixed-height dialog the preview is the point: let it absorb whatever
+   height the picker and the notes leave over, instead of staying a 200px slot. */
+.mcf-modalFixed .mcf-exportText{flex:1 1 auto;min-height:110px;max-height:none}
 .mcf-exportNote{margin:0;color:var(--mcf-text-3);font-size:11px;line-height:16px}
 .mcf-exportWarn{margin:0;color:var(--mcf-danger);font-size:11px;line-height:16px}
 .mcf-importList{box-sizing:border-box;width:100%;max-height:min(44vh,360px);overflow:auto;margin:0;padding:0;border:1px solid var(--mcf-border);border-radius:9px;background:var(--mcf-neutral);list-style:none}
@@ -2837,7 +2840,11 @@ select.mcf-input{appearance:auto;height:34px}
                                 spellCheck: false,
                                 value: text,
                                 "aria-label": title,
-                                onFocus: (event) => event.currentTarget.select()
+                                onFocus: (event) => {
+                                    event.currentTarget.select();
+                                    /* Selecting everything scrolls to the tail; show the head instead. */
+                                    event.currentTarget.scrollTop = 0;
+                                }
                             })), h("div", { className: "mcf-modalFoot" }, exportCopy === "ok"
                                 ? h("span", { className: "mcf-copied", role: "status" }, t("exportCopied"))
                                 : exportCopy === "fail"
