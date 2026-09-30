@@ -89,9 +89,10 @@ Hover `#FAFAFF` + `#DDDDF0`、展开 `#FBFBFF` + `#DCD9FF` 并带 3px 主色强�
 两字母缩写兜底，并已留好 `<img>` 样式钩子。
 
 两个数据量大的弹窗（导出勾选列表、导入预览）用 `.mcf-modalWide` 放宽到 620px、加高到
-`min(780px, calc(100vh - 64px))`，提供商勾选列表用 `.mcf-pickList`（`min(52vh, 420px)`），
-一次能看全十来个提供商而不用在列表内部滚动；其余弹窗维持 460px 的窄版。
-固定高度的弹窗里，预览框（`.mcf-modalFixed .mcf-exportText`）改为 `flex:1 1 auto`，
+`min(780px, calc(100vh - 64px))`，提供商勾选列表用 `.mcf-pickList`（`flex:0 0 auto` +
+`max-height:min(52vh, 420px)`）：列表**只按内容长高、不被压缩**，窗口够高时一次看全十来个提供商，
+窗口变矮时优先保住列表可读性，由**弹窗正文整块滚动**去够到预览；其余弹窗维持 460px 的窄版。
+固定高度的弹窗里，预览框（`.mcf-modalFixed .mcf-exportText`）是 `flex:1 1 auto`，
 **自适应占满勾选列表和提示之后的剩余高度**（窗口太矮时收到 110px 下限、再由正文滚动兜底），
 不再是一个固定 200px 的小格子；点进预览框自动全选时会同步把滚动条拉回开头，
 避免停在 JSON 末尾看起来像被截断。

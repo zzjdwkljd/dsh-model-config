@@ -850,8 +850,10 @@ select.mcf-input{appearance:auto;height:34px}
 .mcf-candActions{display:flex;gap:8px;flex-shrink:0}
 .mcf-candList{max-height:200px;overflow:auto}
 /* The export picker holds every provider at once, so it scrolls only when the
-   window itself is short — never at the two-rows-at-a-time size of 200px. */
-.mcf-pickList{max-height:min(52vh,420px);overflow:auto}
+   window itself is short — never at the two-rows-at-a-time size of 200px.
+   flex:0 0 auto keeps it from being squeezed when the window is small: the
+   dialog body scrolls instead, so the provider list stays readable. */
+.mcf-pickList{flex:0 0 auto;max-height:min(52vh,420px);overflow:auto}
 .mcf-candRow{display:flex;gap:8px;align-items:center;padding:6px 10px;cursor:pointer;font-size:12px}
 .mcf-candRow:hover{background:var(--mcf-surface-hover)}
 .mcf-candId{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:var(--mcf-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
